@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JUTC Real-Time Bus Tracker</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <link rel="stylesheet" href="../STYLES/style.css" />
+</head>
+<body>
+
+  <!-- Header / Navigation -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="index.html" class="logo">JUTC <span>Bus Tracker</span></a>
+      <nav class="nav">
+        <a href="#tracker">Live Map</a>
+        <a href="#eta">Arrival Times</a>
+        <a href="#alerts">Alerts</a>
+        <a href="#routes">Routes</a>
+        <a href="admin.html" class="btn btn-outline">Admin Login</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero + Route Search -->
+    <section class="hero">
+      <div class="container">
+        <h1>Know when your bus is coming.</h1>
+        <p>Track JUTC buses, check arrival times, and plan your journey across the Kingston Metropolitan Region.</p>
+
+        <form id="route-search-form" class="search-card" autocomplete="off">
+          <div class="field">
+            <label for="start-stop">From</label>
+            <input list="stop-list" id="start-stop" placeholder="Starting location" required />
+          </div>
+          <div class="field">
+            <label for="end-stop">To</label>
+            <input list="stop-list" id="end-stop" placeholder="Destination" required />
+          </div>
+          <datalist id="stop-list"></datalist>
+          <button type="submit" class="btn btn-primary">Find Routes</button>
+        </form>
+
+        <div id="search-results" class="search-results" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <!-- Live Map -->
+    <section id="tracker" class="section">
+      <div class="container">
+        <div class="section-head">
+          <h2>Live Bus Tracking</h2>
+         <!-- <span class="badge">Simulated data &bull; updates every 5s</span> -->
+        </div>
+        <div id="map" class="map"></div>
+      </div>
+    </section>
+
+    <!-- ETA Checker -->
+    <section id="eta" class="section section-alt">
+      <div class="container">
+        <h2>Estimated Arrival Times</h2>
+        <div class="eta-controls">
+          <div class="field">
+            <label for="eta-route">Route</label>
+            <select id="eta-route"></select>
+          </div>
+          <div class="field">
+            <label for="eta-stop">Bus stop</label>
+            <select id="eta-stop"></select>
+          </div>
+        </div>
+        <div id="eta-results" class="eta-results" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <!-- Alerts -->
+    <section id="alerts" class="section">
+      <div class="container">
+        <h2>Service Alerts</h2>
+        <div id="alerts-list" class="alerts-list"></div>
+      </div>
+    </section>
+
+    <!-- Routes -->
+    <section id="routes" class="section section-alt">
+      <div class="container">
+        <h2>Available Routes</h2>
+        <div id="routes-list" class="routes-grid"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; 2026 JUTC Real-Time Bus Tracking and Commuter Information System &mdash; </p>
+
+    </div>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="../JS/main.js"></script>
+</body>
+</html>
