@@ -31,13 +31,39 @@
 
   <main class="admin-main">
     <section class="admin-intro">
-      <div class="container">
+      <div class="container admin-intro-row">
         <h1>Route management</h1>
+        <button id="sign-out" type="button" class="btn btn-secondary" hidden>Sign out</button>
       </div>
     </section>
 
     <section class="section admin-section">
-      <div class="container admin-layout">
+      <div class="container">
+        <section id="login-card" class="admin-card login-card" aria-labelledby="login-heading" hidden>
+          <div class="section-head">
+            <div>
+              <p class="eyebrow eyebrow-dark">AUTHORIZED PERSONNEL</p>
+              <h2 id="login-heading">Administrator login</h2>
+            </div>
+          </div>
+          <form id="login-form" class="route-form">
+            <div class="field">
+              <label for="login-email">Email</label>
+              <input id="login-email" name="email" type="email" autocomplete="username" required />
+            </div>
+            <div class="field">
+              <label for="login-password">Password</label>
+              <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+            </div>
+            <div class="form-actions">
+              <button id="login-button" type="submit" class="btn btn-primary">Log in</button>
+            </div>
+          </form>
+          <p id="login-message" class="admin-message" aria-live="polite"></p>
+        </section>
+      </div>
+
+      <div id="admin-content" class="container admin-layout" hidden>
         <section class="admin-card" aria-labelledby="route-form-heading">
           <div class="section-head">
             <div>
@@ -82,6 +108,48 @@
           </div>
           <div id="admin-routes" class="admin-routes" aria-live="polite"></div>
         </section>
+
+        <section class="admin-card" aria-labelledby="alert-form-heading">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow eyebrow-dark">SERVICE INFORMATION</p>
+              <h2 id="alert-form-heading">Publish a service alert</h2>
+            </div>
+          </div>
+          <form id="alert-form" class="route-form">
+            <div class="field">
+              <label for="alert-type">Alert type</label>
+              <select id="alert-type" name="alertType"></select>
+            </div>
+            <div class="field">
+              <label for="alert-route">Route affected</label>
+              <select id="alert-route" name="alertRoute"></select>
+            </div>
+            <div class="field">
+              <label for="alert-message">Message</label>
+              <input id="alert-message" name="alertMessage" type="text" maxlength="120" placeholder="For example, Heavy traffic near Cross Roads" required />
+            </div>
+            <div class="field">
+              <label for="alert-delay">Delay in minutes</label>
+              <input id="alert-delay" name="alertDelay" type="number" min="0" max="120" step="1" value="0" required />
+              <p class="field-help">This is added to the arrival estimates for the route affected.</p>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Publish alert</button>
+            </div>
+          </form>
+          <p id="alert-feedback" class="admin-message" aria-live="polite"></p>
+        </section>
+
+        <section class="admin-card" aria-labelledby="saved-alerts-heading">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow eyebrow-dark">CURRENT ALERTS</p>
+              <h2 id="saved-alerts-heading">Service alert list</h2>
+            </div>
+          </div>
+          <div id="admin-alerts" class="admin-routes" aria-live="polite"></div>
+        </section>
       </div>
     </section>
   </main>
@@ -99,29 +167,18 @@
       <div class="footer-main">
         <div class="footer-columns">
           <div class="footer-group">
-            <h2>Get in touch</h2>
-            <a href="#">Contact us</a>
-            <a href="#">Customer support</a>
-          </div>
-          <div class="footer-group">
             <h2>Information</h2>
-            <a href="#">Routes</a>
-            <a href="#">Service information</a>
+            <a href="index.html#routes">Routes</a>
+            <a href="index.html#alerts">Service information</a>
           </div>
           <div class="footer-group">
             <h2>Plan a journey</h2>
-            <a href="#">Browse routes</a>
-            <a href="#">Arrival estimates</a>
-          </div>
-          <div class="footer-group">
-            <h2>Policies</h2>
-            <a href="#">Privacy policy</a>
-            <a href="#">Accessibility</a>
+            <a href="index.html#tracker">Map preview</a>
+            <a href="index.html#eta">Arrival estimates</a>
           </div>
         </div>
         <div class="footer-bottom">
           <p>© 2026 JUTC Bus Tracker. All rights reserved.</p>
-          <a href="#">Privacy policy</a>
         </div>
       </div>
     </div>

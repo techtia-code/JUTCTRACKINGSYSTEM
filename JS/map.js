@@ -1,30 +1,16 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { makeElement } from "./dom.js";
+import { findBusPosition, makeRoutePath } from "./simulation.js";
 
 const KINGSTON_CENTER = [18.0, -76.8];
-const BUS_SPEED_METRES_PER_SECOND = 120;
-const UPDATE_INTERVAL_MS = 100;
-const REDUCED_MOTION_UPDATE_INTERVAL_MS = 3000;
+const UPDATE_INTERVAL_MS = 5000;
 const ROUTE_COLOURS = ["#0b6e4f", "#d98a00", "#b83b32", "#2563a8", "#7a3e9d"];
 
-// Every stop in VALID_STOPS (main.js) needs an entry here.
-const STOP_COORDINATES = {
-  "Downtown Kingston": [17.9706, -76.7934],
-  "Cross Roads": [17.9935, -76.7877],
-  "Half-Way Tree": [18.0119, -76.7969],
-  "Liguanea": [18.0194, -76.7680],
-  "University of Technology": [18.0165, -76.7435],
-  "Papine": [18.0168, -76.7422],
-  "Spanish Town": [17.9957, -76.9541],
-  "Angels": [18.0357, -76.9678],
-  "Ferry": [18.0235, -76.8770]
-};
-
-function addStops(map, routes) {
+function addStops(map, routes, stopCoordinates) {
   const stops = [...new Set(routes.flatMap(route => route.stops))];
   stops.forEach(stop => {
-    L.circleMarker(STOP_COORDINATES[stop], {
+    L.circleMarker(stopCoordinates[stop], {
       radius: 5,
       color: "#1c2b26",
       weight: 2,
@@ -42,41 +28,16 @@ function makeBusIcon(colour) {
   });
 }
 
-function makeBus(map, route, colour) {
-  const points = route.stops.map(stop => L.latLng(STOP_COORDINATES[stop]));
-  const distances = [0];
-  points.slice(1).forEach((point, index) => {
-    distances.push(distances[index] + points[index].distanceTo(point));
-  });
+function makeBus(map, route, stopCoordinates, colour) {
+  const path = makeRoutePath(route, stopCoordinates);
 
-  L.polyline(points, { color: colour, weight: 4, opacity: 0.75 }).addTo(map);
+  L.polyline(path.points, { color: colour, weight: 4, opacity: 0.75 }).addTo(map);
 
-  const marker = L.marker(points[0], { icon: makeBusIcon(colour), zIndexOffset: 1000 })
+  const marker = L.marker(path.points[0], { icon: makeBusIcon(colour), zIndexOffset: 1000 })
     .bindTooltip(makeElement("span", "", route.name))
     .addTo(map);
 
-  return { route, points, distances, marker, nextStop: null };
-}
-
-function findBusPosition(bus, time) {
-  const { route, points, distances } = bus;
-  const routeLength = distances[distances.length - 1];
-
-  // Each bus runs to the end of its route and back. Using the clock means
-  // every open tab shows the buses in the same place.
-  const travelled = (time / 1000 * BUS_SPEED_METRES_PER_SECOND) % (routeLength * 2);
-  const outbound = travelled < routeLength;
-  const distance = outbound ? travelled : routeLength * 2 - travelled;
-
-  const segment = Math.max(distances.findIndex(value => value >= distance), 1);
-  const from = points[segment - 1];
-  const to = points[segment];
-  const progress = (distance - distances[segment - 1]) / (distances[segment] - distances[segment - 1]);
-
-  return {
-    latLng: L.latLng(from.lat + (to.lat - from.lat) * progress, from.lng + (to.lng - from.lng) * progress),
-    nextStop: route.stops[outbound ? segment : segment - 1]
-  };
+  return { route, path, marker, nextStop: null };
 }
 
 function renderBusList(sidebar, buses, colours) {
@@ -103,7 +64,7 @@ function renderBusList(sidebar, buses, colours) {
 function updateBuses(buses) {
   const time = Date.now();
   buses.forEach(bus => {
-    const { latLng, nextStop } = findBusPosition(bus, time);
+    const { latLng, nextStop } = findBusPosition(bus.route, bus.path, time);
     bus.marker.setLatLng(latLng);
     if (nextStop !== bus.nextStop) {
       bus.nextStop = nextStop;
@@ -112,7 +73,7 @@ function updateBuses(buses) {
   });
 }
 
-export function initMap(routes) {
+export function initMap(routes, stopCoordinates) {
   const sidebar = document.querySelector(".map-sidebar");
   const map = L.map("map", { scrollWheelZoom: false }).setView(KINGSTON_CENTER, 12);
 
@@ -122,16 +83,15 @@ export function initMap(routes) {
   }).addTo(map);
 
   const colours = routes.map((route, index) => ROUTE_COLOURS[index % ROUTE_COLOURS.length]);
-  const buses = routes.map((route, index) => makeBus(map, route, colours[index]));
-  addStops(map, routes);
+  const buses = routes.map((route, index) => makeBus(map, route, stopCoordinates, colours[index]));
+  addStops(map, routes, stopCoordinates);
   renderBusList(sidebar, buses, colours);
 
   if (buses.length > 0) {
-    const bounds = L.latLngBounds(buses.flatMap(bus => bus.points));
+    const bounds = L.latLngBounds(buses.flatMap(bus => bus.path.points));
     map.fitBounds(bounds, { padding: [24, 24] });
   }
 
-  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   updateBuses(buses);
-  setInterval(() => updateBuses(buses), reduceMotion ? REDUCED_MOTION_UPDATE_INTERVAL_MS : UPDATE_INTERVAL_MS);
+  setInterval(() => updateBuses(buses), UPDATE_INTERVAL_MS);
 }

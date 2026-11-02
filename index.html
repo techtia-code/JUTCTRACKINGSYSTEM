@@ -73,6 +73,10 @@
               Sample routes
             </h2>
           </div>
+          <div class="field route-filter">
+            <label for="route-filter">Search routes</label>
+            <input id="route-filter" type="search" placeholder="Route or stop name" autocomplete="off" />
+          </div>
         </div>
         <div id="routes-list" class="routes-grid" aria-live="polite"></div>
       </div>
@@ -106,7 +110,7 @@
               Estimated arrivals
             </h2>
           </div>
-          <p class="section-intro">View an illustrative estimate based on a route's stop order.</p>
+          <p class="section-intro">View an estimate based on the simulated bus position, its average speed and any reported delays.</p>
         </div>
         <div class="eta-panel">
           <div class="eta-controls">
@@ -136,12 +140,7 @@
             </h2>
           </div>
         </div>
-        <div class="alerts-list">
-          <article class="alert">
-            <p class="alert-type">Service information</p>
-            <h3>Service updates are unavailable</h3>
-          </article>
-        </div>
+        <div id="alerts-list" class="alerts-list"></div>
       </div>
     </section>
   </main>
@@ -159,29 +158,18 @@
       <div class="footer-main">
         <div class="footer-columns">
           <div class="footer-group">
-            <h2>Get in touch</h2>
-            <a href="#">Contact us</a>
-            <a href="#">Customer support</a>
-          </div>
-          <div class="footer-group">
             <h2>Information</h2>
-            <a href="#">Routes</a>
-            <a href="#">Service information</a>
+            <a href="#routes">Routes</a>
+            <a href="#alerts">Service information</a>
           </div>
           <div class="footer-group">
             <h2>Plan a journey</h2>
-            <a href="#">Browse routes</a>
-            <a href="#">Arrival estimates</a>
-          </div>
-          <div class="footer-group">
-            <h2>Policies</h2>
-            <a href="#">Privacy policy</a>
-            <a href="#">Accessibility</a>
+            <a href="#tracker">Map preview</a>
+            <a href="#eta">Arrival estimates</a>
           </div>
         </div>
         <div class="footer-bottom">
           <p>© 2026 JUTC Bus Tracker. All rights reserved.</p>
-          <a href="#">Privacy policy</a>
         </div>
       </div>
     </div>

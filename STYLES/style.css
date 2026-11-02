@@ -690,9 +690,25 @@ textarea:focus-visible {
   padding-top: 30px;
 }
 
+.admin-intro-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .admin-layout {
   display: grid;
   gap: 18px;
+}
+
+.login-card {
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+.route-filter {
+  flex: 0 1 320px;
 }
 
 .admin-card {
