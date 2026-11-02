@@ -3,104 +3,191 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>JUTC Real-Time Bus Tracker</title>
-
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
-  <link rel="stylesheet" href="STYLES/style.css" />
+  <meta name="description" content="Plan a sample JUTC journey, view bus routes, and check simulated arrival times." />
+  <title>JUTC Bus Tracker | Plan your journey</title>
+  <link rel="stylesheet" href="./STYLES/style.css" />
 </head>
-<body>
-
-  <!-- Header / Navigation -->
+<body data-page="home">
+  <div id="loading-root"></div>
   <header class="site-header">
     <div class="container header-inner">
       <a href="index.html" class="logo">JUTC <span>Bus Tracker</span></a>
-      <nav class="nav">
-        <a href="#tracker">Live Map</a>
-        <a href="#eta">Arrival Times</a>
-        <a href="#alerts">Alerts</a>
-        <a href="#routes">Routes</a>
-        <a href="admin.html" class="btn btn-outline">Admin Login</a>
+      <nav class="nav" aria-label="Main navigation">
+        <a href="#routes" class="nav-icon-link">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6 9 3l6 3 6-3v15l-6 3-6-3-6 3V6Z"></path><path d="M9 3v15m6-12v15"></path></svg>
+          Routes
+        </a>
+        <a href="#tracker" class="nav-icon-link">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-11a8 8 0 1 0-16 0c0 7 8 11 8 11Z"></path><circle cx="12" cy="11" r="2.5"></circle></svg>
+          Map preview
+        </a>
+        <a href="#eta" class="nav-icon-link">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+          Arrivals
+        </a>
+        <a href="#alerts" class="nav-icon-link">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg>
+          Service information
+        </a>
+        <a href="admin.html" class="btn route-management-link">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6 9 3l6 3 6-3v15l-6 3-6-3-6 3V6Z"></path><path d="M9 3v15m6-12v15"></path></svg>
+          Route management
+        </a>
       </nav>
     </div>
   </header>
 
   <main>
-    <!-- Hero + Route Search -->
     <section class="hero">
-      <div class="container">
-        <h1>Where's My Bus?</h1>
-        
-
+      <div class="container hero-content">
+        <div class="hero-copy">
+          <p class="eyebrow">KINGSTON METROPOLITAN AREA</p>
+          <h1>Plan your next bus journey.</h1>
+        </div>
         <form id="route-search-form" class="search-card" autocomplete="off">
           <div class="field">
-            <label for="start-stop">From</label>
-            <input list="stop-list" id="start-stop" placeholder="Starting location" required />
+            <label for="start-stop">Starting stop</label>
+            <input list="stop-list" id="start-stop" placeholder="Choose a stop" required />
           </div>
           <div class="field">
-            <label for="end-stop">To</label>
-            <input list="stop-list" id="end-stop" placeholder="Destination" required />
+            <label for="end-stop">Destination</label>
+            <input list="stop-list" id="end-stop" placeholder="Choose a stop" required />
           </div>
           <datalist id="stop-list"></datalist>
-          <button type="submit" class="btn btn-primary">Find Routes</button>
+          <button type="submit" class="btn btn-primary">
+            Find a route
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+          </button>
         </form>
-
         <div id="search-results" class="search-results" aria-live="polite"></div>
       </div>
     </section>
 
-    <!-- Live Map -->
-    <section id="tracker" class="section">
+    <section id="routes" class="section">
       <div class="container">
         <div class="section-head">
-          <h2>Live Bus Tracking</h2>
-          <!-- <span class="badge">Simulated data &bull; updates every 5s</span> -->
-        </div>
-        <div id="map" class="map"></div>
-      </div>
-    </section>
-
-    <!-- ETA Checker -->
-    <section id="eta" class="section section-alt">
-      <div class="container">
-        <h2>Estimated Arrival Times</h2>
-        <div class="eta-controls">
-          <div class="field">
-            <label for="eta-route">Route</label>
-            <select id="eta-route"></select>
-          </div>
-          <div class="field">
-            <label for="eta-stop">Bus stop</label>
-            <select id="eta-stop"></select>
+          <div>
+            <p class="eyebrow eyebrow-dark">PLAN A JOURNEY</p>
+            <h2 class="heading-with-icon">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6 9 3l6 3 6-3v15l-6 3-6-3-6 3V6Z"></path><path d="M9 3v15m6-12v15"></path></svg>
+              Sample routes
+            </h2>
           </div>
         </div>
-        <div id="eta-results" class="eta-results" aria-live="polite"></div>
+        <div id="routes-list" class="routes-grid" aria-live="polite"></div>
       </div>
     </section>
 
-    <!-- Alerts -->
-    <section id="alerts" class="section">
+    <section id="tracker" class="section section-alt">
       <div class="container">
-        <h2>Service Alerts</h2>
-        <div id="alerts-list" class="alerts-list"></div>
+        <div class="section-head">
+          <div>
+            <p class="eyebrow eyebrow-dark">TRACKING PREVIEW</p>
+            <h2 class="heading-with-icon">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-11a8 8 0 1 0-16 0c0 7 8 11 8 11Z"></path><circle cx="12" cy="11" r="2.5"></circle></svg>
+              Map preview
+            </h2>
+          </div>
+        </div>
+        <div class="map-layout">
+          <div id="map" class="map" role="img" aria-label="Map preview placeholder"></div>
+          <aside class="map-sidebar" aria-label="Bus information placeholder"></aside>
+        </div>
       </div>
     </section>
 
-    <!-- Routes -->
-    <section id="routes" class="section section-alt">
+    <section id="eta" class="section">
       <div class="container">
-        <h2>Available Routes</h2>
-        <div id="routes-list" class="routes-grid"></div>
+        <div class="section-head">
+          <div>
+            <p class="eyebrow eyebrow-dark">AT YOUR STOP</p>
+            <h2 class="heading-with-icon">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+              Estimated arrivals
+            </h2>
+          </div>
+          <p class="section-intro">View an illustrative estimate based on a route's stop order.</p>
+        </div>
+        <div class="eta-panel">
+          <div class="eta-controls">
+            <div class="field">
+              <label for="eta-route">Route</label>
+              <select id="eta-route"></select>
+            </div>
+            <div class="field">
+              <label for="eta-stop">Bus stop</label>
+              <select id="eta-stop"></select>
+            </div>
+          </div>
+          <div id="eta-results" class="eta-results" aria-live="polite"></div>
+          <p class="fine-print">These estimates are illustrative and do not reflect current traffic or an official timetable.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="alerts" class="section section-alt">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow eyebrow-dark">TRAVEL INFORMATION</p>
+            <h2 class="heading-with-icon">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg>
+              Service information
+            </h2>
+          </div>
+        </div>
+        <div class="alerts-list">
+          <article class="alert">
+            <p class="alert-type">Service information</p>
+            <h3>Service updates are unavailable</h3>
+          </article>
+        </div>
       </div>
     </section>
   </main>
 
   <footer class="site-footer">
-    <div class="container">
-      <p>&copy; 2026 JUTC Real-Time Bus Tracking and Commuter Information System</p>
-     </div>
+    <div class="container footer-shell">
+      <div class="footer-feature">
+        <div class="footer-mark">
+          <a href="index.html" class="footer-brand">JUTC <span>Bus Tracker</span></a>
+        </div>
+        <div class="footer-facts">
+          <div><span>LOCATION</span><strong>Kingston, Jamaica</strong></div>
+        </div>
+      </div>
+      <div class="footer-main">
+        <div class="footer-columns">
+          <div class="footer-group">
+            <h2>Get in touch</h2>
+            <a href="#">Contact us</a>
+            <a href="#">Customer support</a>
+          </div>
+          <div class="footer-group">
+            <h2>Information</h2>
+            <a href="#">Routes</a>
+            <a href="#">Service information</a>
+          </div>
+          <div class="footer-group">
+            <h2>Plan a journey</h2>
+            <a href="#">Browse routes</a>
+            <a href="#">Arrival estimates</a>
+          </div>
+          <div class="footer-group">
+            <h2>Policies</h2>
+            <a href="#">Privacy policy</a>
+            <a href="#">Accessibility</a>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <p>© 2026 JUTC Bus Tracker. All rights reserved.</p>
+          <a href="#">Privacy policy</a>
+        </div>
+      </div>
+    </div>
   </footer>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-  <script src="JS/main.js"></script>
+  <div id="app-error" class="app-error" role="alert" hidden></div>
+  <script type="module" src="./JS/main.js"></script>
 </body>
 </html>

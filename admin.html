@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Manage sample bus routes for the JUTC Bus Tracker demonstration." />
+  <title>Route management | JUTC Bus Tracker</title>
+  <link rel="stylesheet" href="./STYLES/style.css" />
+</head>
+<body data-page="admin">
+  <div id="loading-root"></div>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="index.html" class="logo">JUTC <span>Bus Tracker</span></a>
+      <nav class="nav" aria-label="Main navigation">
+        <a href="index.html#routes" class="nav-icon-link">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6 9 3l6 3 6-3v15l-6 3-6-3-6 3V6Z"></path><path d="M9 3v15m6-12v15"></path></svg>
+          Sample routes
+        </a>
+        <a href="index.html#tracker" class="nav-icon-link">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-11a8 8 0 1 0-16 0c0 7 8 11 8 11Z"></path><circle cx="12" cy="11" r="2.5"></circle></svg>
+          Map preview
+        </a>
+        <a href="index.html" class="btn route-management-link">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+          Back to journey planner
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="admin-main">
+    <section class="admin-intro">
+      <div class="container">
+        <h1>Route management</h1>
+      </div>
+    </section>
+
+    <section class="section admin-section">
+      <div class="container admin-layout">
+        <section class="admin-card" aria-labelledby="route-form-heading">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow eyebrow-dark">ROUTE DETAILS</p>
+              <h2 id="route-form-heading" class="heading-with-icon">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14m-7-7h14"></path></svg>
+                Add a sample route
+              </h2>
+            </div>
+          </div>
+          <form id="route-form" class="route-form">
+            <div class="field">
+              <label for="route-name">Route name</label>
+              <input id="route-name" name="routeName" type="text" maxlength="60" placeholder="For example, Downtown to Half-Way Tree" required />
+            </div>
+            <div class="field">
+              <label for="route-stops">Stops in travel order</label>
+              <textarea id="route-stops" name="routeStops" rows="3" placeholder="Separate each stop with a comma" required></textarea>
+              <p class="field-help">Use these sample stops: <span id="available-stops"></span></p>
+            </div>
+            <div class="form-actions">
+              <button id="save-route" type="submit" class="btn btn-primary">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14m-7-7h14"></path></svg>
+                Add route
+              </button>
+              <button id="cancel-edit" type="button" class="btn btn-secondary" hidden>Cancel</button>
+            </div>
+          </form>
+          <p id="admin-message" class="admin-message" aria-live="polite"></p>
+        </section>
+
+        <section class="admin-card" aria-labelledby="saved-routes-heading">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow eyebrow-dark">CURRENT ROUTES</p>
+              <h2 id="saved-routes-heading" class="heading-with-icon">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6 9 3l6 3 6-3v15l-6 3-6-3-6 3V6Z"></path><path d="M9 3v15m6-12v15"></path></svg>
+                Sample route list
+              </h2>
+            </div>
+            <span id="route-count" class="route-count"></span>
+          </div>
+          <div id="admin-routes" class="admin-routes" aria-live="polite"></div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-shell">
+      <div class="footer-feature">
+        <div class="footer-mark">
+          <a href="index.html" class="footer-brand">JUTC <span>Bus Tracker</span></a>
+        </div>
+        <div class="footer-facts">
+          <div><span>LOCATION</span><strong>Kingston, Jamaica</strong></div>
+        </div>
+      </div>
+      <div class="footer-main">
+        <div class="footer-columns">
+          <div class="footer-group">
+            <h2>Get in touch</h2>
+            <a href="#">Contact us</a>
+            <a href="#">Customer support</a>
+          </div>
+          <div class="footer-group">
+            <h2>Information</h2>
+            <a href="#">Routes</a>
+            <a href="#">Service information</a>
+          </div>
+          <div class="footer-group">
+            <h2>Plan a journey</h2>
+            <a href="#">Browse routes</a>
+            <a href="#">Arrival estimates</a>
+          </div>
+          <div class="footer-group">
+            <h2>Policies</h2>
+            <a href="#">Privacy policy</a>
+            <a href="#">Accessibility</a>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <p>© 2026 JUTC Bus Tracker. All rights reserved.</p>
+          <a href="#">Privacy policy</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <div id="app-error" class="app-error" role="alert" hidden></div>
+  <script type="module" src="./JS/main.js"></script>
+</body>
+</html>
