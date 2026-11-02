@@ -1,3 +1,4 @@
+import { makeElement } from "./dom.js";
 import { mountLoadingSkeleton } from "./loading-ui.jsx";
 
 const ROUTE_STORAGE_KEY = "jutc-demo-routes";
@@ -37,13 +38,6 @@ const ICON_PATHS = {
   "pencil": ["m16 4 4 4", "M4 20l4.5-1 11-11a2.1 2.1 0 0 0-4-4l-11 11L4 20Z"],
   "trash": ["M3 6h18", "M8 6V4h8v2", "m19 6-1 14H6L5 6", "M10 11v5m4-5v5"]
 };
-
-function makeElement(tagName, className, text) {
-  const element = document.createElement(tagName);
-  if (className) element.className = className;
-  if (text !== undefined) element.textContent = text;
-  return element;
-}
 
 function makeIcon(name) {
   const namespace = "http://www.w3.org/2000/svg";
@@ -263,6 +257,16 @@ function initHome(routes) {
   });
   routeSelect.addEventListener("change", setEtaStops);
   stopSelect.addEventListener("change", renderEtas);
+
+  // Loaded on demand so the admin page does not download Leaflet.
+  import("./map.js")
+    .then(({ initMap }) => initMap(routes))
+    .catch(error => {
+      console.error("Could not load the map.", error);
+      document.querySelector(".map-sidebar").replaceChildren(
+        makeElement("p", "empty-state", "The map could not be loaded.")
+      );
+    });
 }
 
 function initAdmin(routes) {
