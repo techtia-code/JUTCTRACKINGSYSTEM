@@ -85,3 +85,7 @@ test("adds delays for the route and for all routes", () => {
   assert.equal(getDelayMinutes(alerts, "a"), 8);
   assert.equal(getDelayMinutes([], "a"), 0);
 });
+test('rejects consecutive coincident or invalid stop coordinates instead of producing NaN', () => {
+  assert.throws(() => makeRoutePath({ stops: ['A','B'] }, { A: [18,-76], B: [18,-76] }), /coordinates|length/i);
+  assert.throws(() => makeRoutePath({ stops: ['A','B'] }, { A: [18,-76], B: [NaN,-76] }), /coordinates/i);
+});

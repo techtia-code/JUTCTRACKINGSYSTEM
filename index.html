@@ -13,6 +13,7 @@
     <div class="container header-inner">
       <a href="index.html" class="logo">JUTC <span>Bus Tracker</span></a>
       <nav class="nav" aria-label="Main navigation">
+        <a href="driver.html">Driver console</a>
         <a href="#routes" class="nav-icon-link">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6 9 3l6 3 6-3v15l-6 3-6-3-6 3V6Z"></path><path d="M9 3v15m6-12v15"></path></svg>
           Routes
@@ -119,11 +120,19 @@
               <select id="eta-route"></select>
             </div>
             <div class="field">
+              <label for="eta-bus">Bus</label>
+              <select id="eta-bus"></select>
+            </div>
+            <div class="field">
               <label for="eta-stop">Bus stop</label>
               <select id="eta-stop"></select>
             </div>
           </div>
           <div id="eta-results" class="eta-results" aria-live="polite"></div>
+          <p id="fleet-message" class="fine-print" role="status"></p>
+          <div class="driver-actions"><button id="watch-bus" class="btn btn-secondary" type="button">Watch this bus</button><button id="stop-watch" class="btn btn-secondary" type="button" hidden>Stop watching</button><button id="enable-notifications" class="btn btn-secondary" type="button">Enable device notifications</button></div>
+          <p id="notification-message" class="fine-print" role="status">Watch a bus for an alert when it is within 1 km of your selected stop or delayed. Device notifications are optional and require this page to stay open.</p>
+          <div id="bus-notifications" class="bus-notifications" aria-live="polite"></div>
           <p class="fine-print">These estimates are illustrative and do not reflect current traffic or an official timetable.</p>
         </div>
       </div>

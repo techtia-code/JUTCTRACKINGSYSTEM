@@ -20,9 +20,15 @@ export function getDistanceMetres(from, to) {
 // from the start of the route.
 export function makeRoutePath(route, stopCoordinates) {
   const points = route.stops.map(stop => stopCoordinates[stop]);
+  if (points.length < 2 || points.some(point => !Array.isArray(point) || point.length !== 2 ||
+    !Number.isFinite(point[0]) || !Number.isFinite(point[1]) || Math.abs(point[0]) > 90 || Math.abs(point[1]) > 180)) {
+    throw new Error('A route requires at least two stops with valid coordinates.');
+  }
   const distances = [0];
   points.slice(1).forEach((point, index) => {
-    distances.push(distances[index] + getDistanceMetres(points[index], point));
+    const segment = getDistanceMetres(points[index], point);
+    if (!Number.isFinite(segment) || segment <= 0) throw new Error('Consecutive route stops must have distinct coordinates and positive travel length.');
+    distances.push(distances[index] + segment);
   });
   return { points, distances };
 }

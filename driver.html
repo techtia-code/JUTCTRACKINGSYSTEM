@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Publish simulated bus locations and manage assigned JUTC demonstration buses." />
+  <title>Driver console | JUTC Bus Tracker</title>
+  <link rel="stylesheet" href="./STYLES/style.css" />
+</head>
+<body data-page="driver">
+  <header class="site-header"><div class="container header-inner">
+    <a class="logo" href="index.html">JUTC <span>Bus Tracker</span></a>
+    <nav class="nav" aria-label="Main navigation"><a href="index.html">Journey planner</a><a href="admin.html">Route management</a></nav>
+  </div></header>
+  <main class="driver-main container">
+    <div class="section-head"><div><p class="eyebrow eyebrow-dark">BUS OPERATIONS</p><h1>Driver console</h1></div><button id="driver-sign-out" class="btn btn-secondary" hidden>Sign out</button></div>
+    <p class="section-intro">Control your assigned sample buses. Positions are simulated and published every five seconds while the engine is on. Keep this page open during a demonstration.</p>
+    <section id="driver-login" class="admin-card" aria-labelledby="driver-login-title">
+      <h2 id="driver-login-title">Driver login</h2>
+      <form id="driver-login-form" class="route-form">
+        <div class="field"><label for="driver-email">Email or admin username</label><input id="driver-email" type="text" autocomplete="username" placeholder="JUTCAdmin2026 or your email" required /></div>
+        <div class="field"><label for="driver-password">Password</label><input id="driver-password" type="password" autocomplete="current-password" required /></div>
+        <button class="btn btn-primary" type="submit">Sign in</button>
+      </form>
+      <button id="driver-demo-login" class="btn btn-primary" hidden>Enter local demo as driver</button>
+    </section>
+    <p id="driver-feedback" class="admin-message" role="status"></p>
+    <section id="driver-console" class="admin-card" aria-labelledby="assigned-title" hidden>
+      <h2 id="assigned-title">Your buses</h2>
+      <div class="field"><label for="driver-bus">Assigned bus</label><select id="driver-bus"></select></div>
+      <div id="driver-bus-details" class="driver-details" aria-live="polite"></div>
+      <div class="driver-actions"><button id="engine-start" class="btn btn-primary">Start engine</button><button id="engine-stop" class="btn btn-secondary">Stop engine</button></div>
+      <div class="field"><label for="driver-status">Service status</label><select id="driver-status"><option value="on_time">On time</option><option value="delayed">Delayed</option></select></div>
+      <button id="driver-save-status" class="btn btn-secondary">Update status</button>
+      <p class="fine-print">Engine off freezes the saved position. If updates stop for more than one minute, passengers see a stale-location warning and no arrival estimate.</p>
+    </section>
+  </main>
+  <div id="app-error" class="app-error" role="alert" hidden></div>
+  <script type="module" src="./JS/main.js"></script>
+</body>
+</html>

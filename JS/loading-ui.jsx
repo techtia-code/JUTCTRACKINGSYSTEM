@@ -242,6 +242,7 @@ function PageSkeleton({ page }) {
     };
     const maximumWait = window.setTimeout(() => setVisible(false), 1800);
     window.addEventListener("jutc:ready", dismiss, { once: true });
+    if (document.documentElement.dataset.jutcReady === 'true') dismiss();
 
     return () => {
       clearTimeout(timer);

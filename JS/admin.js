@@ -11,6 +11,9 @@ import {
   saveAlert,
   saveRoute
 } from "./data.js";
+import { demoLogIn } from './data.js';
+import { isDemoMode } from './supabase.js';
+import { initFleetManagement } from './management.js';
 import { makeElement, makeIcon, setHeading } from "./dom.js";
 import { validateAlert, validateRoute } from "./planner.js";
 
@@ -78,6 +81,7 @@ async function initManagement() {
   }
 
   function renderAdminRoutes() {
+    window.dispatchEvent(new window.Event('jutc:routes-changed'));
     populateAlertRoutes();
     list.replaceChildren();
     count.textContent = currentRoutes.length + (currentRoutes.length === 1 ? " route" : " routes");
@@ -238,7 +242,10 @@ async function initManagement() {
 }
 
 async function showManagement() {
+  const session = await getSession();
+  if (session?.role !== 'admin') throw new Error('This page requires an administrator role. Ask the project owner to assign your account.');
   await initManagement();
+  await initFleetManagement();
   document.getElementById("login-card").hidden = true;
   document.getElementById("admin-content").hidden = false;
   document.getElementById("sign-out").hidden = false;
@@ -250,6 +257,13 @@ function showLogin() {
   const button = document.getElementById("login-button");
 
   document.getElementById("login-card").hidden = false;
+  if (isDemoMode()) {
+    form.hidden = true;
+    const button = makeElement('button', 'btn btn-primary', 'Enter local demo as administrator');
+    button.type = 'button';
+    button.addEventListener('click', async () => { try { demoLogIn('admin'); await showManagement(); } catch (error) { setMessage(message, error.message, true); } });
+    document.getElementById('login-card').append(button);
+  }
 
   form.addEventListener("submit", async event => {
     event.preventDefault();
@@ -270,7 +284,14 @@ function showLogin() {
 export async function initAdmin() {
   const session = await getSession();
   if (session) {
-    await showManagement();
+    try { await showManagement(); }
+    catch (error) {
+      showLogin();
+      setMessage(document.getElementById('login-message'), error.message, true);
+      const out = makeElement('button', 'btn btn-secondary', 'Sign out of this account');
+      out.addEventListener('click', async () => { await logOut(); window.location.reload(); });
+      document.getElementById('login-card').append(out);
+    }
   } else {
     showLogin();
   }
