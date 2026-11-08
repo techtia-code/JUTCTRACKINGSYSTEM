@@ -1,17 +1,20 @@
--- Run this once in the Supabase SQL editor if your database was created
--- with an older schema.sql that let any logged-in user change data.
--- New databases do not need it: schema.sql already includes these changes.
+-- Run this in the Supabase SQL editor if your database was created with an
+-- older schema.sql that let any logged-in user change data. New databases
+-- do not need it: schema.sql already includes these changes.
 --
--- Before running it, change admin@example.com at the bottom to the email
--- address of your administrator login.
+-- It is safe to run more than once: it only adds what is missing.
+--
+-- Before running it, change the email at the bottom to the email address
+-- of your administrator login. The result lists every administrator, so
+-- you can check that the email was found.
 
-create table admins (
+create table if not exists admins (
   user_id uuid primary key references auth.users (id) on delete cascade
 );
 
 alter table admins enable row level security;
 
-create function is_admin() returns boolean
+create or replace function is_admin() returns boolean
 language sql
 stable
 set search_path = ''
@@ -19,14 +22,15 @@ as $$
   select exists (select 1 from public.admins where user_id = (select auth.uid()));
 $$;
 
+drop policy if exists "Users can see if they are an administrator" on admins;
 create policy "Users can see if they are an administrator" on admins for select to authenticated
   using (user_id = (select auth.uid()));
 
 -- Replace the rules that let any logged-in user change data.
-drop policy "Administrators can change stops" on stops;
-drop policy "Administrators can change routes" on routes;
-drop policy "Administrators can change route stops" on route_stops;
-drop policy "Administrators can change alerts" on alerts;
+drop policy if exists "Administrators can change stops" on stops;
+drop policy if exists "Administrators can change routes" on routes;
+drop policy if exists "Administrators can change route stops" on route_stops;
+drop policy if exists "Administrators can change alerts" on alerts;
 
 create policy "Administrators can change stops" on stops for all to authenticated using (is_admin()) with check (is_admin());
 create policy "Administrators can change routes" on routes for all to authenticated using (is_admin()) with check (is_admin());
@@ -36,7 +40,7 @@ create policy "Administrators can change alerts" on alerts for all to authentica
 -- Saves a route and its stops in one step, so a failed save never leaves a
 -- route half changed. Pass null as target_route_id to add a new route.
 -- It runs with the caller's permissions, so the policies above still apply.
-create function save_route(target_route_id uuid, route_name text, stop_names text[])
+create or replace function save_route(target_route_id uuid, route_name text, stop_names text[])
 returns uuid
 language plpgsql
 set search_path = ''
@@ -77,4 +81,9 @@ revoke execute on function save_route(uuid, text, text[]) from public, anon;
 grant execute on function save_route(uuid, text, text[]) to authenticated;
 
 insert into admins (user_id)
-select id from auth.users where email = 'admin@example.com';
+select id from auth.users where email = 'dontaetracey91@gmail.com'
+on conflict (user_id) do nothing;
+
+select users.email as administrator
+from admins
+join auth.users users on users.id = admins.user_id;

@@ -85,7 +85,7 @@ You need [Node.js](https://nodejs.org) 22.12 or newer and a free Supabase accoun
 
    Open the address it prints (usually http://127.0.0.1:5173). The admin page is at `/admin.html` and the driver page at `/driver.html`. Phones only share GPS with a secure (https) site or `localhost`, so test sharing from a phone on the published site; Simulate a drive works anywhere.
 
-**Upgrading an older database:** run these once in the SQL Editor, in this order, if your database is older than them:
+**Upgrading an older database:** run these in the SQL Editor, in this order, if your database is older than them. Both are safe to run again; they only add what is missing.
 1. [`supabase/update-admin-access.sql`](supabase/update-admin-access.sql), if any logged-in user can still change data (edit the email at the bottom first).
 2. [`supabase/add-driver-tracking.sql`](supabase/add-driver-tracking.sql), if there is no `drivers` table yet. Until it runs, every bus is simulated and the driver page can't log in.
 

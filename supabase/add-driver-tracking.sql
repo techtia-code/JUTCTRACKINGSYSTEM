@@ -1,6 +1,9 @@
--- Bus drivers and live bus locations. Run this once in the Supabase SQL
--- editor on a database created before drivers were added. New databases do
--- not need it: schema.sql already includes it.
+-- Bus drivers and live bus locations. Run this in the Supabase SQL editor
+-- on a database created before drivers were added. New databases do not
+-- need it: schema.sql already includes it.
+--
+-- It is safe to run more than once: it only adds what is missing. Run
+-- update-admin-access.sql first if the database has no admins table.
 --
 -- To add a driver afterwards:
 --   1. In Authentication, add a user with an email address and password.
@@ -13,14 +16,14 @@
 
 -- Which route each driver drives. Drivers are added in the SQL editor, like
 -- administrators; the website cannot change this table.
-create table drivers (
+create table if not exists drivers (
   user_id uuid primary key references auth.users (id) on delete cascade,
   route_id uuid not null references routes (id) on delete cascade
 );
 
 -- The last position a driver shared for their route: one bus per route.
 -- The limits are Jamaica (JAMAICA_BOUNDS in JS/planner.js).
-create table bus_locations (
+create table if not exists bus_locations (
   route_id uuid primary key references routes (id) on delete cascade,
   lat double precision not null check (lat between 17.6 and 18.6),
   lng double precision not null check (lng between -78.4 and -76.1),
@@ -32,17 +35,20 @@ alter table drivers enable row level security;
 alter table bus_locations enable row level security;
 
 -- Lets the driver page find the logged-in driver's route.
+drop policy if exists "Drivers can see their own route" on drivers;
 create policy "Drivers can see their own route" on drivers for select to authenticated
   using (user_id = (select auth.uid()));
+drop policy if exists "Administrators can see drivers" on drivers;
 create policy "Administrators can see drivers" on drivers for select to authenticated
   using (is_admin());
 -- Anyone can read bus locations. Nobody writes them directly: only through
 -- share_bus_location() and stop_sharing_location() below.
+drop policy if exists "Anyone can read bus locations" on bus_locations;
 create policy "Anyone can read bus locations" on bus_locations for select using (true);
 
 -- Positions shared in the last minute. The database's clock decides what
 -- is live, so a wrong clock on a visitor's phone does not matter.
-create view live_bus_locations with (security_invoker = true) as
+create or replace view live_bus_locations with (security_invoker = true) as
   select route_id, lat, lng, direction, updated_at
   from public.bus_locations
   where updated_at > now() - interval '60 seconds';
@@ -51,7 +57,7 @@ create view live_bus_locations with (security_invoker = true) as
 -- the database's time. It runs as the table owner so drivers need no write
 -- access to bus_locations, which means they cannot move another route's
 -- bus or change the time.
-create function share_bus_location(p_lat double precision, p_lng double precision, p_direction text)
+create or replace function share_bus_location(p_lat double precision, p_lng double precision, p_direction text)
 returns void
 language plpgsql
 security definer
@@ -80,7 +86,7 @@ end;
 $$;
 
 -- Takes the logged-in driver's bus off the map straight away.
-create function stop_sharing_location()
+create or replace function stop_sharing_location()
 returns void
 language plpgsql
 security definer
