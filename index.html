@@ -110,7 +110,7 @@
               Estimated arrivals
             </h2>
           </div>
-          <p class="section-intro">View an estimate based on the simulated bus position, its average speed and any reported delays.</p>
+          <p class="section-intro">View an estimate based on where the bus is (shared by its driver, or simulated when no driver is sharing), its average speed and any reported delays.</p>
         </div>
         <div class="eta-panel">
           <div class="eta-controls">
@@ -124,6 +124,7 @@
             </div>
           </div>
           <div id="eta-results" class="eta-results" aria-live="polite"></div>
+          <p id="eta-notice" class="eta-notice" role="status" hidden></p>
           <p class="fine-print">These estimates are illustrative and do not reflect current traffic or an official timetable.</p>
         </div>
       </div>
@@ -166,6 +167,11 @@
             <h2>Plan a journey</h2>
             <a href="#tracker">Map preview</a>
             <a href="#eta">Arrival estimates</a>
+          </div>
+          <div class="footer-group">
+            <h2>Staff</h2>
+            <a href="driver.html">Bus drivers</a>
+            <a href="admin.html">Route management</a>
           </div>
         </div>
         <div class="footer-bottom">

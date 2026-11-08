@@ -8,7 +8,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         home: "index.html",
-        admin: "admin.html"
+        admin: "admin.html",
+        driver: "driver.html"
       }
     }
   }

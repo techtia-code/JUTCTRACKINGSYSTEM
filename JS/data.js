@@ -22,22 +22,85 @@ export async function loadStops() {
   return checkResult(await getSupabase().from("stops").select("id, name, lat, lng").order("name"));
 }
 
+// Postgres error codes the admin page explains in plain words
+const UNIQUE_VIOLATION = "23505";
+const FOREIGN_KEY_VIOLATION = "23503";
+
+// Inserts a new stop (stopId null) or updates one.
+export async function saveStop(stopId, name, lat, lng) {
+  const query = stopId
+    ? getSupabase().from("stops").update({ name, lat, lng }).eq("id", stopId).select("id")
+    : getSupabase().from("stops").insert({ name, lat, lng }).select("id");
+  const result = await query;
+  if (result.error?.code === UNIQUE_VIOLATION) throw new Error("A stop already uses that name.");
+  checkChanged(result);
+}
+
+export async function deleteStop(stopId) {
+  const result = await getSupabase().from("stops").delete().eq("id", stopId).select("id");
+  if (result.error?.code === FOREIGN_KEY_VIOLATION) {
+    throw new Error("A route still uses this stop. Remove it from the route first.");
+  }
+  checkChanged(result);
+}
+
+function toRoute(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    stops: [...row.route_stops]
+      .sort((first, second) => first.position - second.position)
+      .map(routeStop => routeStop.stops.name)
+  };
+}
+
 export async function loadRoutes() {
   const rows = checkResult(await getSupabase()
     .from("routes")
     .select("id, name, route_stops(position, stops(name))")
     .order("name"));
 
-  const routes = rows.map(row => ({
-    id: row.id,
-    name: row.name,
-    stops: [...row.route_stops]
-      .sort((first, second) => first.position - second.position)
-      .map(routeStop => routeStop.stops.name)
-  }));
-
   // A bus needs at least two stops to travel between.
-  return routes.filter(route => route.stops.length >= 2);
+  return rows.map(toRoute).filter(route => route.stops.length >= 2);
+}
+
+// Bus positions shared by drivers in the last minute, by route id. The
+// live_bus_locations view (supabase/schema.sql) leaves out older ones, so
+// the database's clock decides what is live, not the visitor's.
+export async function loadLiveBusLocations() {
+  const rows = checkResult(await getSupabase()
+    .from("live_bus_locations")
+    .select("route_id, lat, lng, direction, updated_at"));
+  return new Map(rows.map(row => [row.route_id, {
+    latLng: [row.lat, row.lng],
+    direction: row.direction,
+    updatedAt: row.updated_at
+  }]));
+}
+
+// The route the logged-in driver drives, or null for anyone who is not a
+// driver. Administrators can see every driver's row, so ask for our own.
+export async function loadMyRoute() {
+  const session = await getSession();
+  if (!session) return null;
+  const row = checkResult(await getSupabase()
+    .from("drivers")
+    .select("routes(id, name, route_stops(position, stops(name)))")
+    .eq("user_id", session.user.id)
+    .maybeSingle());
+  if (!row || !row.routes) return null;
+  const route = toRoute(row.routes);
+  return route.stops.length >= 2 ? route : null;
+}
+
+// share_bus_location() works out the driver's route itself and stamps the
+// time, so a driver can only move their own bus.
+export async function shareBusLocation(lat, lng, direction) {
+  checkResult(await getSupabase().rpc("share_bus_location", { p_lat: lat, p_lng: lng, p_direction: direction }));
+}
+
+export async function stopSharingLocation() {
+  checkResult(await getSupabase().rpc("stop_sharing_location"));
 }
 
 // save_route (supabase/schema.sql) saves the name and stops together, so

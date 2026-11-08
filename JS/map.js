@@ -1,7 +1,7 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { makeElement } from "./dom.js";
-import { findBusPosition, makeRoutePath } from "./simulation.js";
+import { findPositionFromTravelled, getBusTravelled, makeRoutePath } from "./simulation.js";
 
 const KINGSTON_CENTER = [18.0, -76.8];
 const UPDATE_INTERVAL_MS = 5000;
@@ -37,11 +37,11 @@ function makeBus(map, route, stopCoordinates, colour) {
     .bindTooltip(makeElement("span", "", route.name))
     .addTo(map);
 
-  return { route, path, marker, nextStop: null };
+  return { route, path, marker, nextStop: null, live: null };
 }
 
 function renderBusList(sidebar, buses, colours) {
-  sidebar.replaceChildren(makeElement("h3", "bus-list-heading", "Sample buses"));
+  sidebar.replaceChildren(makeElement("h3", "bus-list-heading", "Buses"));
   if (buses.length === 0) {
     sidebar.append(makeElement("p", "empty-state", "There are no sample routes to display yet."));
     return;
@@ -54,26 +54,39 @@ function renderBusList(sidebar, buses, colours) {
     dot.style.background = colours[index];
     const details = makeElement("div", "");
     bus.nextStopElement = makeElement("p", "muted-copy");
-    details.append(makeElement("strong", "", bus.route.name), bus.nextStopElement);
+    bus.sourceElement = makeElement("span", "bus-source");
+    details.append(makeElement("strong", "", bus.route.name), bus.sourceElement, bus.nextStopElement);
     item.append(dot, details);
     list.append(item);
   });
   sidebar.append(list);
 }
 
-function updateBuses(buses) {
+// A route's bus is drawn where its driver last shared it, when that was in
+// the last minute, and otherwise where the simulation puts it.
+function updateBuses(buses, liveLocations) {
   const time = Date.now();
   buses.forEach(bus => {
-    const { latLng, nextStop } = findBusPosition(bus.route, bus.path, time);
-    bus.marker.setLatLng(latLng);
+    const { travelled, live } = getBusTravelled(bus.path, liveLocations.get(bus.route.id), time);
+    const { latLng, nextStop } = findPositionFromTravelled(bus.route, bus.path, travelled);
+    // A live bus is drawn where the driver is, not where they were matched onto the route line.
+    bus.marker.setLatLng(live ? liveLocations.get(bus.route.id).latLng : latLng);
     if (nextStop !== bus.nextStop) {
       bus.nextStop = nextStop;
       bus.nextStopElement.textContent = "Next stop: " + nextStop;
     }
+    if (live !== bus.live) {
+      bus.live = live;
+      bus.sourceElement.textContent = live ? "Live from the driver" : "Simulated";
+      bus.sourceElement.classList.toggle("is-live", live);
+      bus.marker.getElement()?.classList.toggle("is-live", live);
+    }
   });
 }
 
-export function initMap(routes, stopCoordinates) {
+// getLiveLocations returns the latest shared positions by route id; home.js
+// refreshes them every 5 seconds.
+export function initMap(routes, stopCoordinates, getLiveLocations) {
   const sidebar = document.querySelector(".map-sidebar");
   const map = L.map("map", { scrollWheelZoom: false }).setView(KINGSTON_CENTER, 12);
 
@@ -92,6 +105,6 @@ export function initMap(routes, stopCoordinates) {
     map.fitBounds(bounds, { padding: [24, 24] });
   }
 
-  updateBuses(buses);
-  setInterval(() => updateBuses(buses), UPDATE_INTERVAL_MS);
+  updateBuses(buses, getLiveLocations());
+  setInterval(() => updateBuses(buses, getLiveLocations()), UPDATE_INTERVAL_MS);
 }

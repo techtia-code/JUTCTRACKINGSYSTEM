@@ -1,16 +1,27 @@
-import { ALERT_TYPES, loadAlerts, loadRoutes, loadStops } from "./data.js";
+import { ALERT_TYPES, loadAlerts, loadLiveBusLocations, loadRoutes, loadStops } from "./data.js";
 import { makeElement } from "./dom.js";
+import { checkWatch, startWatch } from "./notify.js";
 import { findJourneys, routeMatchesSearch } from "./planner.js";
-import { getDelayMinutes, getEtaMinutes, makeRoutePath } from "./simulation.js";
+import { getBusTravelled, getDelayMinutes, getEtaFromTravelled, getMetresToStop, makeRoutePath } from "./simulation.js";
 
 const ETA_UPDATE_INTERVAL_MS = 5000;
 const ALERT_UPDATE_INTERVAL_MS = 30000;
+
+function canUseBrowserNotifications() {
+  return "Notification" in window && Notification.permission === "granted";
+}
 
 export async function initHome() {
   const [allStops, routes, loadedAlerts] = await Promise.all([loadStops(), loadRoutes(), loadAlerts()]);
   let alerts = loadedAlerts;
   let etaTime = null;
   let etaDetails = null;
+  let notifyButton = null;
+  // The commuter's "Notify me" request for the selected route and stop
+  let watch = null;
+  // Positions drivers shared in the last minute, by route id
+  let liveLocations = new Map();
+  let liveLoadFailed = false;
 
   const stopCoordinates = Object.fromEntries(allStops.map(stop => [stop.name, [stop.lat, stop.lng]]));
   const paths = new Map(routes.map(route => [route.id, makeRoutePath(route, stopCoordinates)]));
@@ -23,6 +34,7 @@ export async function initHome() {
   const etaResults = document.getElementById("eta-results");
   const searchResults = document.getElementById("search-results");
   const alertsList = document.getElementById("alerts-list");
+  const etaNotice = document.getElementById("eta-notice");
 
   stops.forEach(stop => stopList.append(makeElement("option", "", stop)));
 
@@ -119,20 +131,104 @@ export async function initHome() {
     if (element.textContent !== text) element.textContent = text;
   }
 
+  function showNotice(text, isAlert) {
+    etaNotice.hidden = !text;
+    etaNotice.textContent = text;
+    etaNotice.classList.toggle("is-alert", Boolean(isAlert));
+  }
+
+  // Tells the commuter on the page, and with a browser notification when
+  // they allowed them (so they hear about it in another tab too).
+  function alertCommuter(message) {
+    showNotice(message.text, true);
+    if (canUseBrowserNotifications()) {
+      try {
+        new Notification("JUTC Bus Tracker", { body: message.text, tag: "jutc-" + message.kind });
+      } catch (error) {
+        // Some phone browsers only show notifications from a service worker;
+        // the message on the page is enough.
+        console.warn("Could not show a browser notification.", error);
+      }
+    }
+    if (navigator.vibrate) navigator.vibrate(200);
+  }
+
+  function setNotifyButton() {
+    if (!notifyButton) return;
+    notifyButton.textContent = watch ? "Stop notifying me" : "Notify me when it's near";
+    notifyButton.setAttribute("aria-pressed", String(Boolean(watch)));
+  }
+
+  async function toggleWatch() {
+    const route = routes.find(item => item.id === routeSelect.value);
+    const stop = stopSelect.value;
+    if (watch) {
+      watch = null;
+      setNotifyButton();
+      showNotice("", false);
+      return;
+    }
+    if (!route || !stop) return;
+
+    if ("Notification" in window && Notification.permission === "default") {
+      try {
+        await Notification.requestPermission();
+      } catch (error) {
+        console.warn("Could not ask for notification permission.", error);
+      }
+    }
+    watch = startWatch(route.id, stop, getDelayMinutes(alerts, route.id));
+    setNotifyButton();
+    showNotice(
+      "We'll tell you when the bus is within 1 km of " + stop + ", and about any new delay on the way." +
+        (canUseBrowserNotifications() ? "" : " Keep this page open: the message will show here."),
+      false
+    );
+    updateEta();
+  }
+
   function updateEta() {
     const route = routes.find(item => item.id === routeSelect.value);
     const stop = stopSelect.value;
     if (!route || !stop || !etaTime) return;
 
+    const path = paths.get(route.id);
     const delay = getDelayMinutes(alerts, route.id);
-    const minutes = getEtaMinutes(route, paths.get(route.id), stop, Date.now(), delay);
+    const { travelled, live } = getBusTravelled(path, liveLocations.get(route.id), Date.now());
+    const minutes = getEtaFromTravelled(route, path, stop, travelled, delay);
     setText(etaTime, minutes < 1 ? "Arriving now" : "About " + minutes + " min");
-    setText(etaDetails, "Estimate for " + stop + (delay > 0 ? " (includes a " + delay + " min delay)" : ""));
+    setText(etaDetails,
+      "Estimate for " + stop +
+      (live ? ", from the driver's location" : ", from the simulated bus") +
+      (delay > 0 ? " (includes a " + delay + " min delay)" : ""));
+
+    if (watch && watch.routeId === route.id && watch.stop === stop) {
+      const result = checkWatch(watch, getMetresToStop(route, path, stop, travelled), delay);
+      watch = result.watch.done ? null : result.watch;
+      result.messages.forEach(alertCommuter);
+      if (!watch) setNotifyButton();
+    }
+  }
+
+  async function refreshLiveLocations() {
+    try {
+      liveLocations = await loadLiveBusLocations();
+      liveLoadFailed = false;
+    } catch (error) {
+      // Before the driver tables exist, or offline: every bus is simulated.
+      if (!liveLoadFailed) console.error("Could not load the drivers' bus locations.", error);
+      liveLoadFailed = true;
+      liveLocations = new Map();
+    }
   }
 
   function renderEtas() {
     etaResults.replaceChildren();
     etaTime = null;
+    notifyButton = null;
+    // A different route or stop ends the last "Notify me".
+    watch = null;
+    showNotice("", false);
     const route = routes.find(item => item.id === routeSelect.value);
     const stop = stopSelect.value;
     if (!route || !stop) {
@@ -145,7 +241,13 @@ export async function initHome() {
     etaDetails = makeElement("p", "muted-copy");
     etaTime = makeElement("span", "eta-time");
     description.append(makeElement("strong", "", route.name), etaDetails);
-    item.append(description, etaTime);
+    notifyButton = makeElement("button", "btn btn-secondary notify-button");
+    notifyButton.type = "button";
+    notifyButton.addEventListener("click", toggleWatch);
+    setNotifyButton();
+    const side = makeElement("div", "eta-side");
+    side.append(etaTime, notifyButton);
+    item.append(description, side);
     etaResults.append(item);
     updateEta();
   }
@@ -180,6 +282,7 @@ export async function initHome() {
     }
   }
 
+  await refreshLiveLocations();
   populateRouteSelect();
   renderRoutes();
   setEtaStops();
@@ -201,12 +304,15 @@ export async function initHome() {
   });
   routeSelect.addEventListener("change", setEtaStops);
   stopSelect.addEventListener("change", renderEtas);
-  setInterval(updateEta, ETA_UPDATE_INTERVAL_MS);
+  setInterval(async () => {
+    await refreshLiveLocations();
+    updateEta();
+  }, ETA_UPDATE_INTERVAL_MS);
   setInterval(refreshAlerts, ALERT_UPDATE_INTERVAL_MS);
 
   // Loaded on demand so the admin page does not download Leaflet.
   import("./map.js")
-    .then(({ initMap }) => initMap(routes, stopCoordinates))
+    .then(({ initMap }) => initMap(routes, stopCoordinates, () => liveLocations))
     .catch(error => {
       console.error("Could not load the map.", error);
       document.querySelector(".map-sidebar").replaceChildren(

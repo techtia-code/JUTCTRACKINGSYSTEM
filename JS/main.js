@@ -1,4 +1,5 @@
 import { initAdmin } from "./admin.js";
+import { initDriver } from "./driver.js";
 import { initHome } from "./home.js";
 import { mountLoadingSkeleton } from "./loading-ui.jsx";
 
@@ -15,6 +16,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   try {
     if (document.body.dataset.page === "home") await initHome();
     if (document.body.dataset.page === "admin") await initAdmin();
+    if (document.body.dataset.page === "driver") await initDriver();
   } catch (error) {
     console.error("Could not initialize the JUTC bus tracker demonstration.", error);
     showAppError(error);

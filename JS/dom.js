@@ -34,3 +34,8 @@ export function makeIcon(name) {
 export function setHeading(heading, iconName, label) {
   heading.replaceChildren(makeIcon(iconName), document.createTextNode(label));
 }
+
+export function setMessage(element, text, isError) {
+  element.textContent = text;
+  element.classList.toggle("error", Boolean(isError));
+}

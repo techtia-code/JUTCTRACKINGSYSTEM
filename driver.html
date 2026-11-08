@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Bus drivers share their bus's location with the JUTC Bus Tracker." />
+  <title>Bus drivers | JUTC Bus Tracker</title>
+  <link rel="stylesheet" href="./STYLES/style.css" />
+</head>
+<body data-page="driver">
+  <div id="loading-root"></div>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="index.html" class="logo">JUTC <span>Bus Tracker</span></a>
+      <nav class="nav" aria-label="Main navigation">
+        <a href="index.html#tracker" class="nav-icon-link">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-11a8 8 0 1 0-16 0c0 7 8 11 8 11Z"></path><circle cx="12" cy="11" r="2.5"></circle></svg>
+          Map preview
+        </a>
+        <a href="index.html" class="btn route-management-link">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+          Back to journey planner
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="admin-main">
+    <section class="admin-intro">
+      <div class="container admin-intro-row">
+        <h1>Bus drivers</h1>
+        <button id="sign-out" type="button" class="btn btn-secondary" hidden>Sign out</button>
+      </div>
+    </section>
+
+    <section class="section admin-section">
+      <div class="container">
+        <section id="login-card" class="admin-card login-card" aria-labelledby="login-heading" hidden>
+          <div class="section-head">
+            <div>
+              <p class="eyebrow eyebrow-dark">AUTHORIZED PERSONNEL</p>
+              <h2 id="login-heading">Driver login</h2>
+            </div>
+          </div>
+          <form id="login-form" class="route-form">
+            <div class="field">
+              <label for="login-email">Email</label>
+              <input id="login-email" name="email" type="email" autocomplete="username" required />
+            </div>
+            <div class="field">
+              <label for="login-password">Password</label>
+              <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+            </div>
+            <div class="form-actions">
+              <button id="login-button" type="submit" class="btn btn-primary">Log in</button>
+            </div>
+          </form>
+          <p id="login-message" class="admin-message" aria-live="polite"></p>
+        </section>
+      </div>
+
+      <div id="driver-content" class="container" hidden>
+        <section class="admin-card driver-card" aria-labelledby="driver-route">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow eyebrow-dark">YOUR ROUTE</p>
+              <h2 id="driver-route"></h2>
+              <p id="driver-route-stops" class="muted-copy"></p>
+            </div>
+          </div>
+
+          <p id="driver-status" class="driver-status" aria-live="polite">Not sharing</p>
+          <p id="driver-last-sent" class="muted-copy" aria-live="polite"></p>
+
+          <div class="form-actions">
+            <button id="share-gps" type="button" class="btn btn-primary">Share my location</button>
+            <button id="simulate-drive" type="button" class="btn btn-secondary">Simulate a drive</button>
+            <button id="stop-sharing" type="button" class="btn btn-secondary" hidden>Stop sharing</button>
+          </div>
+          <p id="driver-message" class="admin-message" aria-live="polite"></p>
+
+          <p class="fine-print">
+            While sharing is on, your bus's position is sent every 5 seconds and shown on the map
+            and in arrival estimates. Keep this page open while you drive. When you stop, or after
+            one minute without an update, the map goes back to the simulated bus.
+            Simulate a drive moves your bus along the route from its first stop, for demonstrations.
+          </p>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-shell">
+      <div class="footer-feature">
+        <div class="footer-mark">
+          <a href="index.html" class="footer-brand">JUTC <span>Bus Tracker</span></a>
+        </div>
+        <div class="footer-facts">
+          <div><span>LOCATION</span><strong>Kingston, Jamaica</strong></div>
+        </div>
+      </div>
+      <div class="footer-main">
+        <div class="footer-columns">
+          <div class="footer-group">
+            <h2>Information</h2>
+            <a href="index.html#routes">Routes</a>
+            <a href="index.html#alerts">Service information</a>
+          </div>
+          <div class="footer-group">
+            <h2>Staff</h2>
+            <a href="driver.html">Bus drivers</a>
+            <a href="admin.html">Route management</a>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <p>© 2026 JUTC Bus Tracker. All rights reserved.</p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <div id="app-error" class="app-error" role="alert" hidden></div>
+  <script type="module" src="./JS/main.js"></script>
+</body>
+</html>
