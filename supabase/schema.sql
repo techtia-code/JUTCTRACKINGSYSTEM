@@ -1,9 +1,12 @@
 -- JUTC Bus Tracker database. Run this once in the Supabase SQL editor.
 --
 -- After running it, open Authentication in the Supabase dashboard:
---   1. Turn off "Allow new users to sign up". The rules below let any
---      logged-in user change data, so accounts must only come from step 2.
+--   1. Turn off "Allow new users to sign up".
 --   2. Add a user. This is the administrator login.
+--   3. Make that user an administrator by running this in the SQL editor
+--      with their email address:
+--        insert into admins (user_id)
+--        select id from auth.users where email = 'admin@example.com';
 
 create table stops (
   id bigint generated always as identity primary key,
@@ -35,24 +38,84 @@ create table alerts (
   created_at timestamptz not null default now()
 );
 
--- Anyone can read. Only logged-in administrators can make changes.
+-- Only users listed here can change data. Add administrators in the SQL
+-- editor; the website cannot change this table.
+create table admins (
+  user_id uuid primary key references auth.users (id) on delete cascade
+);
+
+-- Anyone can read. Only administrators can make changes.
 alter table stops enable row level security;
 alter table routes enable row level security;
 alter table route_stops enable row level security;
 alter table alerts enable row level security;
+alter table admins enable row level security;
+
+create function is_admin() returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select exists (select 1 from public.admins where user_id = (select auth.uid()));
+$$;
 
 create policy "Anyone can read stops" on stops for select using (true);
 create policy "Anyone can read routes" on routes for select using (true);
 create policy "Anyone can read route stops" on route_stops for select using (true);
 create policy "Anyone can read alerts" on alerts for select using (true);
+-- Lets the admin page check whether the logged-in user is an administrator.
+create policy "Users can see if they are an administrator" on admins for select to authenticated
+  using (user_id = (select auth.uid()));
 
-create policy "Administrators can change stops" on stops for all to authenticated using (true) with check (true);
-create policy "Administrators can change routes" on routes for all to authenticated using (true) with check (true);
-create policy "Administrators can change route stops" on route_stops for all to authenticated using (true) with check (true);
-create policy "Administrators can change alerts" on alerts for all to authenticated using (true) with check (true);
+create policy "Administrators can change stops" on stops for all to authenticated using (is_admin()) with check (is_admin());
+create policy "Administrators can change routes" on routes for all to authenticated using (is_admin()) with check (is_admin());
+create policy "Administrators can change route stops" on route_stops for all to authenticated using (is_admin()) with check (is_admin());
+create policy "Administrators can change alerts" on alerts for all to authenticated using (is_admin()) with check (is_admin());
+
+-- Saves a route and its stops in one step, so a failed save never leaves a
+-- route half changed. Pass null as target_route_id to add a new route.
+-- It runs with the caller's permissions, so the policies above still apply.
+create function save_route(target_route_id uuid, route_name text, stop_names text[])
+returns uuid
+language plpgsql
+set search_path = ''
+as $$
+declare
+  saved_id uuid := target_route_id;
+begin
+  if coalesce(cardinality(stop_names), 0) < 2 then
+    raise exception 'A route needs at least two stops.';
+  end if;
+
+  if saved_id is null then
+    insert into public.routes (name) values (route_name) returning id into saved_id;
+  else
+    update public.routes set name = route_name where id = saved_id;
+    -- Row level security skips rows the user cannot change instead of raising an error.
+    if not found then
+      raise exception 'The route was not found, or you are not allowed to change it.';
+    end if;
+    delete from public.route_stops where route_id = saved_id;
+  end if;
+
+  insert into public.route_stops (route_id, stop_id, position)
+  select saved_id, stops.id, stop_list.position
+  from unnest(stop_names) with ordinality as stop_list (name, position)
+  join public.stops on stops.name = stop_list.name;
+
+  if (select count(*) from public.route_stops where route_id = saved_id) <> cardinality(stop_names) then
+    raise exception 'One or more of the stops do not exist.';
+  end if;
+
+  return saved_id;
+end;
+$$;
 
 grant select on stops, routes, route_stops, alerts to anon;
 grant select, insert, update, delete on stops, routes, route_stops, alerts to authenticated;
+grant select on admins to authenticated;
+revoke execute on function save_route(uuid, text, text[]) from public, anon;
+grant execute on function save_route(uuid, text, text[]) to authenticated;
 
 -- Sample data.
 insert into stops (name, lat, lng) values

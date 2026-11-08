@@ -40,26 +40,14 @@ export async function loadRoutes() {
   return routes.filter(route => route.stops.length >= 2);
 }
 
-async function saveRouteStops(routeId, stopNames, allStops) {
-  const rows = stopNames.map((stopName, index) => ({
-    route_id: routeId,
-    stop_id: allStops.find(stop => stop.name === stopName).id,
-    position: index + 1
+// save_route (supabase/schema.sql) saves the name and stops together, so
+// the route is left unchanged if any part of the save fails.
+export async function saveRoute(routeId, name, stopNames) {
+  checkResult(await getSupabase().rpc("save_route", {
+    target_route_id: routeId,
+    route_name: name,
+    stop_names: stopNames
   }));
-  checkResult(await getSupabase().from("route_stops").insert(rows));
-}
-
-export async function saveRoute(routeId, name, stopNames, allStops) {
-  const supabase = getSupabase();
-  if (!routeId) {
-    const newRoute = checkResult(await supabase.from("routes").insert({ name }).select("id").single());
-    await saveRouteStops(newRoute.id, stopNames, allStops);
-    return;
-  }
-
-  checkChanged(await supabase.from("routes").update({ name }).eq("id", routeId).select("id"));
-  checkChanged(await supabase.from("route_stops").delete().eq("route_id", routeId).select("route_id"));
-  await saveRouteStops(routeId, stopNames, allStops);
 }
 
 export async function deleteRoute(routeId) {
@@ -98,6 +86,13 @@ export async function deleteAlert(alertId) {
 export async function getSession() {
   const { session } = checkResult(await getSupabase().auth.getSession());
   return session;
+}
+
+// The admins table only shows users their own row, so any row means the
+// logged-in user is an administrator.
+export async function isAdmin() {
+  const rows = checkResult(await getSupabase().from("admins").select("user_id"));
+  return rows.length > 0;
 }
 
 export async function logIn(email, password) {

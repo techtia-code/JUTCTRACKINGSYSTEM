@@ -3,6 +3,7 @@ import {
   deleteAlert,
   deleteRoute,
   getSession,
+  isAdmin,
   loadAlerts,
   loadRoutes,
   loadStops,
@@ -179,7 +180,7 @@ async function initManagement() {
 
     saveButton.disabled = true;
     try {
-      await saveRoute(editingId, result.name, result.stops, allStops);
+      await saveRoute(editingId, result.name, result.stops);
       currentRoutes = await loadRoutes();
     } catch (error) {
       console.error("Could not save the sample route.", error);
@@ -257,6 +258,11 @@ function showLogin() {
     setMessage(message, "", false);
     try {
       await logIn(document.getElementById("login-email").value.trim(), document.getElementById("login-password").value);
+      if (!await isAdmin()) {
+        await logOut();
+        setMessage(message, "This account is not an administrator.", true);
+        return;
+      }
       await showManagement();
     } catch (error) {
       console.error("Could not log in.", error);
@@ -269,9 +275,12 @@ function showLogin() {
 
 export async function initAdmin() {
   const session = await getSession();
-  if (session) {
+  if (session && await isAdmin()) {
     await showManagement();
-  } else {
-    showLogin();
+    return;
   }
+
+  // Someone who is logged in but not an administrator gets the login form.
+  if (session) await logOut();
+  showLogin();
 }
