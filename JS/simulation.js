@@ -121,7 +121,10 @@ export function findPositionFromTravelled(route, path, travelledMetres) {
 
   return {
     latLng: [from[0] + (to[0] - from[0]) * progress, from[1] + (to[1] - from[1]) * progress],
-    nextStop: route.stops[outbound ? segment : segment - 1]
+    nextStop: route.stops[outbound ? segment : segment - 1],
+    // Which pair of stops the bus is between, and how far (0 to 1) from the first.
+    leg: segment - 1,
+    progress
   };
 }
 

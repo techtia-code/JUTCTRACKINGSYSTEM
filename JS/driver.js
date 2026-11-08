@@ -8,6 +8,7 @@ import {
   stopSharingLocation
 } from "./data.js";
 import { setMessage } from "./dom.js";
+import { fetchRoadLegs, positionOnRoads } from "./roads.js";
 import {
   AVERAGE_SPEED_METRES_PER_SECOND,
   findPositionFromTravelled,
@@ -32,6 +33,9 @@ async function showDriver(route) {
   const allStops = await loadStops();
   const stopCoordinates = Object.fromEntries(allStops.map(stop => [stop.name, [stop.lat, stop.lng]]));
   const path = makeRoutePath(route, stopCoordinates);
+  // Simulated drives follow the same roads as the map, once they have loaded.
+  let roadLegs = null;
+  fetchRoadLegs(path.points).then(legs => { roadLegs = legs; });
 
   const status = document.getElementById("driver-status");
   const lastSent = document.getElementById("driver-last-sent");
@@ -134,7 +138,7 @@ async function showDriver(route) {
     const tick = () => {
       const travelled = (Date.now() - startedAt) / 1000 * AVERAGE_SPEED_METRES_PER_SECOND;
       latest = {
-        latLng: findPositionFromTravelled(route, path, travelled).latLng,
+        latLng: positionOnRoads(findPositionFromTravelled(route, path, travelled), roadLegs),
         direction: getDirectionFromTravelled(path, travelled)
       };
       send();

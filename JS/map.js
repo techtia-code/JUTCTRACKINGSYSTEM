@@ -1,6 +1,7 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { makeElement } from "./dom.js";
+import { fetchRoadLegs, positionOnRoads } from "./roads.js";
 import { findPositionFromTravelled, getBusTravelled, makeRoutePath } from "./simulation.js";
 
 const KINGSTON_CENTER = [18.0, -76.8];
@@ -31,13 +32,21 @@ function makeBusIcon(colour) {
 function makeBus(map, route, stopCoordinates, colour) {
   const path = makeRoutePath(route, stopCoordinates);
 
-  L.polyline(path.points, { color: colour, weight: 4, opacity: 0.75 }).addTo(map);
+  // Straight lines between stops until the roads load.
+  const line = L.polyline(path.points, { color: colour, weight: 4, opacity: 0.75 }).addTo(map);
 
   const marker = L.marker(path.points[0], { icon: makeBusIcon(colour), zIndexOffset: 1000 })
     .bindTooltip(makeElement("span", "", route.name))
     .addTo(map);
 
-  return { route, path, marker, nextStop: null, live: null };
+  return { route, path, line, roadLegs: null, marker, nextStop: null, live: null };
+}
+
+async function loadRoads(bus) {
+  const roadLegs = await fetchRoadLegs(bus.path.points);
+  if (!roadLegs) return;
+  bus.roadLegs = roadLegs;
+  bus.line.setLatLngs(roadLegs.flat());
 }
 
 function renderBusList(sidebar, buses, colours) {
@@ -68,9 +77,10 @@ function updateBuses(buses, liveLocations) {
   const time = Date.now();
   buses.forEach(bus => {
     const { travelled, live } = getBusTravelled(bus.path, liveLocations.get(bus.route.id), time);
-    const { latLng, nextStop } = findPositionFromTravelled(bus.route, bus.path, travelled);
+    const position = findPositionFromTravelled(bus.route, bus.path, travelled);
+    const { nextStop } = position;
     // A live bus is drawn where the driver is, not where they were matched onto the route line.
-    bus.marker.setLatLng(live ? liveLocations.get(bus.route.id).latLng : latLng);
+    bus.marker.setLatLng(live ? liveLocations.get(bus.route.id).latLng : positionOnRoads(position, bus.roadLegs));
     if (nextStop !== bus.nextStop) {
       bus.nextStop = nextStop;
       bus.nextStopElement.textContent = "Next stop: " + nextStop;
@@ -106,5 +116,6 @@ export function initMap(routes, stopCoordinates, getLiveLocations) {
   }
 
   updateBuses(buses, getLiveLocations());
+  buses.forEach(bus => loadRoads(bus).then(() => updateBuses([bus], getLiveLocations())));
   setInterval(() => updateBuses(buses, getLiveLocations()), UPDATE_INTERVAL_MS);
 }

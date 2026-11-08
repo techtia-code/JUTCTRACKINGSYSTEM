@@ -9,7 +9,7 @@ This is a school project, not affiliated with the Jamaica Urban Transit Company.
 **Journey planner (`index.html`)**
 - Find a direct route between two stops, in either direction.
 - Search the route list by route name or stop.
-- Map of Kingston with each route, its stops and its bus, plus a list showing each bus's next stop and whether it is live from the driver or simulated.
+- Map of Kingston with each route drawn along the roads, its stops and its bus, plus a list showing each bus's next stop and whether it is live from the driver or simulated.
 - Arrival estimates for any stop, updated every 5 seconds and including any delays from service alerts.
 - **Notify me when it's near:** a message (and a browser notification, if allowed) when the bus is within 1 km of the chosen stop, or when a new delay is reported for the route. It works while the page is open.
 - Service alerts, refreshed every 30 seconds.
@@ -17,7 +17,7 @@ This is a school project, not affiliated with the Jamaica Urban Transit Company.
 **Bus drivers (`driver.html`)**
 - Driver login.
 - **Share my location:** sends the phone's GPS position every 5 seconds while sharing is on.
-- **Simulate a drive:** moves the driver's bus along the route from its first stop, for demonstrations away from a bus.
+- **Simulate a drive:** moves the driver's bus along the route's roads from its first stop, for demonstrations away from a bus.
 - **Stop sharing:** takes the bus off the map. A bus that has not been updated for a minute goes back to the simulation.
 
 **Route management (`admin.html`)**
@@ -31,6 +31,7 @@ This is a school project, not affiliated with the Jamaica Urban Transit Company.
 - HTML, CSS and JavaScript, bundled with [Vite](https://vite.dev)
 - [Supabase](https://supabase.com) for the database and login
 - [Leaflet](https://leafletjs.com) with [OpenStreetMap](https://www.openstreetmap.org) map tiles
+- The free public [OSRM](https://project-osrm.org) routing service for the roads each route follows
 - [Tailwind CSS](https://tailwindcss.com), plus React and Framer Motion for the loading screen
 - Node's built-in test runner for unit tests
 
@@ -94,7 +95,7 @@ You need [Node.js](https://nodejs.org) 22.12 or newer and a free Supabase accoun
 | Command | What it does |
 |---|---|
 | `npm run dev` | Starts the development server |
-| `npm test` | Runs the unit tests for the journey planner, form checks, bus positions, arrival estimates and notifications |
+| `npm test` | Runs the unit tests for the journey planner, form checks, bus positions, road lines, arrival estimates and notifications |
 | `npm run build` | Builds the finished website into `dist/` |
 | `npm run preview` | Serves the `dist/` build locally |
 
@@ -104,13 +105,15 @@ You need [Node.js](https://nodejs.org) 22.12 or newer and a free Supabase accoun
 
 **Simulated buses.** A route with no live driver has one simulated bus that drives from its first stop to its last and back, at an average speed of 30 km/h. Its position is worked out from the current time, so every visitor sees the bus in the same place.
 
+**Road lines.** When the map opens, it asks the OSRM routing service for the roads between each pair of stops and redraws each route along them. The answer is saved in the browser, so each route is only fetched once. Simulated buses, including a driver's Simulate a drive, move along those roads. The bus's timing still comes from the straight-line distance between stops, so on a winding stretch it moves a little faster than 30 km/h. If OSRM can't be reached, routes are drawn as straight lines between stops.
+
 **Arrival estimates.** For the chosen stop, the site finds how far the bus still has to travel to reach it, in whichever direction gets there first:
 
 ```
 ETA (minutes) = distance to the stop ÷ average speed + delays from service alerts
 ```
 
-Distances are straight lines between stops, worked out from their coordinates with the haversine formula.
+Distances are straight lines between stops, worked out from their coordinates with the haversine formula. Real roads are longer, so for a real bus the estimate comes out a little early.
 
 **Notify me.** Every 5 seconds, with the arrival estimate, the page checks how far the bus is from the chosen stop. At 1 km or less it shows the message once and stops watching; a new delay alert for the route is announced as it appears.
 
@@ -125,6 +128,7 @@ admin.html                    Route management page
 JS/main.js                    Starts the right page
 JS/home.js                    Journey planner, route list, arrivals, Notify me and alerts
 JS/map.js                     Leaflet map and moving buses
+JS/roads.js                   Road shapes for each route from OSRM
 JS/driver.js                  Driver login and location sharing
 JS/admin.js                   Login, stop, route and alert management
 JS/data.js                    All reading and writing of Supabase data
@@ -144,6 +148,7 @@ tests/                        Unit tests
 
 - Each route has one bus. A route with no driver sharing shows a simulated bus.
 - Notify me only works while the page is open; there is no push to a closed phone.
-- Route lines are drawn straight between stops rather than following the roads.
-- Stop locations are approximate.
+- Arrival estimates and the bus's timing use straight-line distances between stops, not the length of the roads.
+- Road lines come from OSRM's free public server, which is meant for light use. If it's down, routes are drawn as straight lines.
+- Stop locations are approximate. A stop placed on a highway can make the road line take a long detour to reach it, so put stops on the road the bus actually uses.
 - The journey planner only finds direct routes, not trips that need a change of bus.

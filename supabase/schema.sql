@@ -132,7 +132,7 @@ insert into stops (name, lat, lng) values
   ('University of Technology', 18.0165, -76.7435),
   ('Papine', 18.0168, -76.7422),
   ('Spanish Town', 17.9957, -76.9541),
-  ('Angels', 18.0357, -76.9678),
+  ('Angels', 18.0406, -76.9795),
   ('Ferry', 18.0235, -76.8770);
 
 insert into routes (name) values
