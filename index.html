@@ -83,7 +83,7 @@
       </div>
     </section>
 
-    <section id="tracker" class="section section-alt">
+    <section id="tracker" class="section section-alt" tabindex="-1">
       <div class="container">
         <div class="section-head">
           <div>
@@ -93,6 +93,10 @@
               Map preview
             </h2>
           </div>
+        </div>
+        <div class="map-tools">
+          <p id="map-selection" class="fine-print" role="status">Showing all routes and buses.</p>
+          <button id="show-all-routes" class="btn btn-secondary" type="button" hidden>Show all routes</button>
         </div>
         <div class="map-layout">
           <div id="map" class="map" role="region" aria-label="Map of sample bus routes in Kingston"></div>

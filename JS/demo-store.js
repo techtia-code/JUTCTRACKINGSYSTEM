@@ -1,16 +1,39 @@
 import { makeSampleData } from './sample-data.js';
-import { elapsedSeconds, simulateBus } from './fleet.js';
+import { elapsedSeconds, projectSimulatedBus, simulateBus } from './fleet.js';
 import { validateAlert, validateRoute, validateStop } from './planner.js';
 import { makeRoutePath } from './simulation.js';
 
 const DATA_KEY = 'jutc-demo-data-v1';
 const SESSION_KEY = 'jutc-demo-session-v1';
+const DEMO_DRIVER = { id: 'demo-driver', name: 'Demo Driver', email: 'driver@jutc.example.invalid' };
+
+function resolveDriver(identifier) {
+  const value = identifier?.trim().toLowerCase();
+  if (!value) return null;
+  if (value === DEMO_DRIVER.name.toLowerCase() || value === DEMO_DRIVER.email) return DEMO_DRIVER.id;
+  throw new Error('No driver matches that name or email. Use Demo Driver or driver@jutc.example.invalid.');
+}
 
 export function createDemoStore({ storage, sessionStorage, now = Date.now }) {
   function read() {
     const saved = storage.getItem(DATA_KEY);
     if (saved) {
-      try { const state = JSON.parse(saved); if (state.version === 1) return state; } catch { /* Explain corrupt data instead of overwriting it. */ }
+      try {
+        const state = JSON.parse(saved);
+        if (state.version === 1) {
+          // Upgrade saved demo labels without resetting routes, assignments or positions.
+          let number = 1001, changed = false;
+          const used = new Set(state.buses.map(bus => bus.label.toUpperCase()));
+          for (const bus of state.buses) {
+            if (bus.autonomousSimulation === undefined) { bus.autonomousSimulation = true; changed = true; }
+            if (!/^JUTC-DEMO-\d+$/.test(bus.label)) continue;
+            while (used.has(`JUTC-${number}`)) number++;
+            bus.label = `JUTC-${number++}`; used.add(bus.label); changed = true;
+          }
+          if (changed) storage.setItem(DATA_KEY, JSON.stringify(state));
+          return state;
+        }
+      } catch { /* Explain corrupt data instead of overwriting it. */ }
       throw new Error('Local demo data could not be read. Clear this site\'s demo data in browser settings to reset it.');
     }
     const state = makeSampleData(now()); storage.setItem(DATA_KEY, JSON.stringify(state)); return state;
@@ -37,13 +60,13 @@ export function createDemoStore({ storage, sessionStorage, now = Date.now }) {
     loadAlerts: () => read().alerts,
     loadBuses() {
       const state = read(); const coords = Object.fromEntries(state.stops.map(s => [s.name, [s.lat, s.lng]]));
-      return state.buses.map(bus => bus.preview ? { ...bus, ...simulateBus(bus, state.routes.find(r => r.id === bus.routeId), coords, now()), updatedAt: new Date(now()).toISOString() } : bus);
+      return state.buses.map(bus => projectSimulatedBus(bus, state.routes.find(r => r.id === bus.routeId), coords, now()));
     },
     loadAssignedBuses() {
       const state = read(), user = session(); if (!user) throw new Error('Sign in first.');
       return this.loadBuses().filter(bus => user.role === 'admin' || state.assignments.some(a => a.busId === bus.id && a.driverId === user.user.id));
     },
-    loadAssignments() { admin(); return read().assignments; },
+    loadAssignments() { admin(); return read().assignments.map(a => ({ busId: a.busId, driverName: DEMO_DRIVER.name, driverEmail: DEMO_DRIVER.email })); },
     saveStop(name, lat, lng) {
       admin(); return mutate(state => { const value = validateStop(name, lat, lng, state.stops); if (value.error) throw new Error(value.error);
         state.stops.push({ id: id(), ...value }); });
@@ -93,17 +116,17 @@ export function createDemoStore({ storage, sessionStorage, now = Date.now }) {
       s.alerts.unshift({ id: id(), routeId: routeId || null, routeName: s.routes.find(r => r.id === routeId)?.name || 'All routes', type, ...result });
     }); },
     deleteAlert(alertId) { admin(); mutate(s => { s.alerts = s.alerts.filter(a => a.id !== alertId); }); },
-    saveBus(label, routeId, driverId) { admin(); return mutate(s => {
+    saveBus(label, routeId, driver) { admin(); return mutate(s => {
       label = label.trim(); if (!label || label.length > 60 || s.buses.some(b => b.label.toLowerCase() === label.toLowerCase())) throw new Error('Enter a unique bus label (1 to 60 characters).');
       const route = s.routes.find(r => r.id === routeId); if (!route) throw new Error('Choose an available route.');
       makeRoutePath(route, Object.fromEntries(s.stops.map(stop => [stop.name, [stop.lat, stop.lng]])));
-      if (driverId && driverId !== 'demo-driver') throw new Error('Use demo-driver as the driver ID in local demo mode.');
+      const driverId = resolveDriver(driver);
       const stop = s.stops.find(x => x.name === route.stops[0]); const busId = id();
-      s.buses.push({ id: busId, label, routeId, engineOn: false, status: 'on_time', startedAt: null, progressSeconds: 0, locationProgressSeconds: 0, lat: stop.lat, lng: stop.lng, nextStop: route.stops[1], updatedAt: new Date(now()).toISOString() });
+      s.buses.push({ id: busId, label, routeId, engineOn: true, autonomousSimulation: true, status: 'on_time', startedAt: new Date(now()).toISOString(), progressSeconds: 0, locationProgressSeconds: 0, lat: stop.lat, lng: stop.lng, nextStop: route.stops[1], updatedAt: new Date(now()).toISOString() });
       if (driverId) s.assignments.push({ busId, driverId }); return busId;
     }); },
-    assignBus(busId, driverId) { admin(); mutate(s => { if (!s.buses.some(b => b.id === busId)) throw new Error('Bus not found.');
-      if (driverId && driverId !== 'demo-driver') throw new Error('Use demo-driver in local demo mode.');
+    assignBus(busId, driver) { admin(); mutate(s => { if (!s.buses.some(b => b.id === busId)) throw new Error('Bus not found.');
+      const driverId = resolveDriver(driver);
       const bus = s.buses.find(b => b.id === busId); if (bus.engineOn && !bus.preview) throw new Error('Stop the bus before changing its driver.');
       s.assignments = s.assignments.filter(a => a.busId !== busId); if (driverId) s.assignments.push({ busId, driverId }); }); },
     updateBus(busId, action, status) { return mutate(s => {

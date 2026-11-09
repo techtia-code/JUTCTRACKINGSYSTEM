@@ -1,6 +1,7 @@
 import { getSupabase, isDemoMode } from './supabase.js';
 import { createDemoStore } from './demo-store.js';
 import { loginEmail } from './login.js';
+import { projectSimulatedBus } from './fleet.js';
 
 export const ALERT_TYPES = { delay: 'Delay', route_change: 'Route change', disruption: 'Service disruption' };
 let demo;
@@ -20,7 +21,7 @@ export function busFromRow(input) {
   if (Array.isArray(input) && input.length !== 1) throw new Error('Expected one saved bus record.');
   const row = Array.isArray(input) ? input[0] : input;
   if (!row?.id || !Number.isFinite(row.lat) || !Number.isFinite(row.lng)) throw new Error('The bus response did not contain a valid saved location.');
-  return { id: row.id, label: row.label, routeId: row.route_id, engineOn: row.engine_on,
+  return { id: row.id, label: row.label, routeId: row.route_id, engineOn: row.engine_on, autonomousSimulation: row.autonomous_simulation === true,
     status: row.status, startedAt: row.started_at, progressSeconds: row.progress_seconds,
     locationProgressSeconds: row.location_progress_seconds, lat: row.lat, lng: row.lng,
     nextStop: row.next_stop, updatedAt: row.location_updated_at };
@@ -86,7 +87,15 @@ export function demoLogIn(role) {
 }
 export async function loadBuses() {
   if (isDemoMode()) return local().loadBuses();
-  return checked(await getSupabase().from('buses').select('*').order('label')).map(busFromRow);
+  const [result, routes, stops] = await Promise.all([
+    getSupabase().from('buses').select('*').order('label'), loadRoutes(), loadStops()
+  ]);
+  const coordinates = Object.fromEntries(stops.map(stop => [stop.name, [stop.lat, stop.lng]]));
+  const now = Date.now();
+  return checked(result).map(busFromRow).map(bus => {
+    const route = routes.find(route => route.id === bus.routeId);
+    return route ? projectSimulatedBus(bus, route, coordinates, now) : bus;
+  });
 }
 export async function loadAssignedBuses() {
   if (isDemoMode()) return local().loadAssignedBuses();
@@ -137,17 +146,22 @@ export async function shareBusLocation(lat, lng, direction) {
 export async function stopSharingLocation() {
   if (!isDemoMode()) checked(await getSupabase().rpc('stop_sharing_location'));
 }
-export async function saveBus(label, routeId, driverId) {
-  if (isDemoMode()) return local().saveBus(label, routeId, driverId);
-  checked(await getSupabase().rpc('create_bus', { p_label: label.trim(), p_route_id: routeId, p_driver_id: driverId || null }));
+function driverManagementResult(result) {
+  if (result.error?.code === 'PGRST202') throw new Error('Driver assignment by name or email requires supabase/update-driver-privacy.sql. Ask the project administrator to apply it.');
+  return checked(result);
+}
+export async function saveBus(label, routeId, driver) {
+  if (isDemoMode()) return local().saveBus(label, routeId, driver);
+  driverManagementResult(await getSupabase().rpc('jutc_create_bus', { p_label: label.trim(), p_route_id: routeId, p_driver_identifier: driver?.trim() || null }));
 }
 export async function loadAssignments() {
   if (isDemoMode()) return local().loadAssignments();
-  return checked(await getSupabase().from('bus_assignments').select('bus_id,driver_id')).map(a => ({ busId: a.bus_id, driverId: a.driver_id }));
+  return driverManagementResult(await getSupabase().rpc('jutc_fleet_assignments'))
+    .map(a => ({ busId: a.bus_id, driverName: a.driver_name, driverEmail: a.driver_email }));
 }
-export async function assignBus(busId, driverId) {
-  if (isDemoMode()) return local().assignBus(busId, driverId);
-  checked(await getSupabase().rpc('assign_bus', { p_bus_id: busId, p_driver_id: driverId || null }));
+export async function assignBus(busId, driver) {
+  if (isDemoMode()) return local().assignBus(busId, driver);
+  driverManagementResult(await getSupabase().rpc('jutc_assign_bus', { p_bus_id: busId, p_driver_identifier: driver?.trim() || null }));
 }
 export async function updateBus(busId, action, status = null) {
   if (isDemoMode()) return local().updateBus(busId, action, status);

@@ -8,6 +8,7 @@ This is a school project, not affiliated with the Jamaica Urban Transit Company.
 
 **Journey planner (`index.html`)**
 - Find a direct route between two stops, in either direction.
+- Journey search opens the matching routes and their buses on the map. Use **View buses on map** to focus one route, or **Show all routes** to reset the map. Route-name filtering also filters the map; bus refreshes preserve the selected view.
 - Search the route list by route name or stop.
 - Map of Kingston with each route drawn along the roads, its stops and its bus, plus a list showing each bus's next stop and whether it is live from the driver or simulated.
 - Arrival estimates for any stop, updated every 5 seconds and including any delays from service alerts.
@@ -19,14 +20,15 @@ This is a school project, not affiliated with the Jamaica Urban Transit Company.
 - **Share my location:** sends the phone's GPS position every 5 seconds while sharing is on.
 - **Simulate a drive:** moves the driver's bus along the route's roads from its first stop, for demonstrations away from a bus.
 - **Stop sharing:** removes the route-shared bus. Individually managed fleet buses keep their own saved state; stale or parked fleet buses have no arrival estimate.
-- Existing fleet controls remain available: select an assigned bus, start/stop its engine and update its on-time/delayed status. Administrators can operate any fleet bus.
+- Simulated fleet buses run by default without a driver login. Select an assigned bus to stop/restart its engine or update its on-time/delayed status. A stopped bus stays parked until restarted; signing out leaves running simulations active. Administrators can operate any fleet bus.
+- **Go Live** starts or resumes the selected bus simulation. Phone GPS sharing remains a separate control.
 
 **Route management (`admin.html`)**
 - Administrator login.
 - Add, edit and delete stops (a stop a route uses cannot be deleted).
 - Add, edit and delete routes.
 - Publish and remove service alerts (delays, route changes and disruptions) for one route or all routes.
-- Add individually labelled buses and assign parked buses to driver accounts.
+- Add individually labelled buses and assign parked buses using a driver's name or email. Driver account UUIDs are handled inside the database.
 
 ## Built with
 
@@ -41,7 +43,9 @@ This is a school project, not affiliated with the Jamaica Urban Transit Company.
 
 **Live buses.** While a driver is sharing, their page sends the bus's position and direction to the database every 5 seconds through `share_bus_location()`. The function works out the driver's route and stamps the time itself, so a driver can only move their own bus. The planner reads `live_bus_locations`, which only returns positions from the last minute, so a bus whose driver stopped or lost signal goes back to the simulation on its own. A shared position is matched to the nearest point on the route line to work out the next stop and the arrival estimate.
 
-**Simulated buses.** A route with no live driver has one simulated bus that drives from its first stop to its last and back, at an average speed of 30 km/h. Its position is worked out from the current time, so every visitor sees the bus in the same place.
+**Simulated buses.** Each running fleet bus moves from its first stop to its last and back at an average speed of 30 km/h. Its position comes from its saved engine start time and progress, so it keeps moving without a driver page publishing updates. Driver Stop/Start commands save the shared state for everyone. Stopped buses remain parked and have no arrival estimate. Phone GPS feeds remain separate and expire after a minute without updates.
+
+Existing databases need `supabase/update-bus-simulation.sql` once to enable automatic simulation and start the current fleet. Running the script again preserves later manual stops. New installations already include the defaults in `schema.sql`. Editing route geometry still parks affected buses so they can be restarted on the changed route.
 
 **Road lines.** When the map opens, it asks the OSRM routing service for the roads between each pair of stops and redraws each route along them. The answer is saved in the browser, so each route is only fetched once. Simulated buses, including a driver's Simulate a drive, move along those roads. The bus's timing still comes from the straight-line distance between stops, so on a winding stretch it moves a little faster than 30 km/h. If OSRM can't be reached, routes are drawn as straight lines between stops.
 
@@ -56,6 +60,8 @@ Distances are straight lines between stops, worked out from their coordinates wi
 **Notify me.** Every 5 seconds, with the arrival estimate, the page checks how far the bus is from the chosen stop. At 1 km or less it shows the message once and stops watching; a new delay alert for the route is announced as it appears.
 
 **Who can change data.** Supabase row level security rules mean anyone can read stops, routes, alerts and bus locations, but only administrator accounts in `user_roles` or the compatible `admins` table can change management data. Fleet drivers can operate only their assigned buses. Drivers listed in `drivers` can share a location for their own route only. The rules are enforced by the database, so they can't be bypassed from the browser. Route changes are saved by a single database function (`jutc_save_route`), so a route is either fully saved or left unchanged.
+
+**Driver assignments.** Administrators enter an existing driver's email or name (from the account's `full_name`, `name` or `display_name` profile field). Names must match exactly, ignoring capitalization and surrounding spaces; use email when names are duplicated. The database resolves the account internally and returns only the bus ID, driver name and email to management. Contact details are administrator-only, and accounts can read only their own raw role/assignment records. Existing databases need `supabase/update-driver-privacy.sql`; fresh installations already include it.
 
 ## Merge compatibility
 

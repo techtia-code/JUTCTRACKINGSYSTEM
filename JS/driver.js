@@ -38,8 +38,8 @@ export async function initDriver() {
     timer = setInterval(async () => {
       if (busy) return; busy = true;
       try { const current = await loadAssignedBuses();
-        for (const bus of current.filter(b => b.engineOn)) await updateBus(bus.id, 'publish');
-        await refresh(); message('Assigned bus locations checked.');
+        for (const bus of current.filter(b => b.engineOn && !b.autonomousSimulation)) await updateBus(bus.id, 'publish');
+        await refresh(); message('Assigned bus locations checked. Simulated buses run automatically.');
       } catch (error) { message(`Location update failed: ${error.message}`, true); }
       finally { busy = false; }
     }, BUS_UPDATE_INTERVAL_MS);
@@ -59,9 +59,9 @@ export async function initDriver() {
     if (busy) return; busy = true;
     try {
       if (stopRouteSharing) await stopRouteSharing();
-      // Stop owned running buses before ending the session so they do not appear to keep moving.
+      // Autonomous simulations retain their saved state after sign-out.
       const session = await getSession();
-      if (session && ['admin', 'driver'].includes(session.role)) for (const bus of (await loadAssignedBuses()).filter(b => b.engineOn && !b.preview)) await updateBus(bus.id, 'stop');
+      if (session && ['admin', 'driver'].includes(session.role)) for (const bus of (await loadAssignedBuses()).filter(b => b.engineOn && !b.preview && !b.autonomousSimulation)) await updateBus(bus.id, 'stop');
       await logOut(); clearInterval(timer); window.location.reload();
     } catch (error) { message(error.message, true); } finally { busy = false; }
   });

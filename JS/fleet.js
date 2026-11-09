@@ -26,6 +26,14 @@ export function simulateBus(bus, route, coordinates, now = Date.now()) {
   return { lat: position.latLng[0], lng: position.latLng[1], nextStop: position.nextStop };
 }
 
+// Fleet simulation follows the saved engine clock; no driver page or public writes are required.
+export function projectSimulatedBus(bus, route, coordinates, now = Date.now()) {
+  if (!bus.autonomousSimulation || !bus.engineOn || bus.source === 'driver') return bus;
+  return { ...bus, ...simulateBus(bus, route, coordinates, now),
+    locationProgressSeconds: elapsedSeconds(bus, now), updatedAt: new Date(now).toISOString(),
+    preview: true, source: 'simulation' };
+}
+
 export function isFresh(bus, now = Date.now()) {
   const timestamp = Date.parse(bus.updatedAt);
   return Number.isFinite(timestamp) && now - timestamp <= STALE_AFTER_MS && now - timestamp >= -10000;

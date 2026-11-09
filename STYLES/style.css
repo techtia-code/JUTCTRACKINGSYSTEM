@@ -1110,6 +1110,8 @@ textarea:focus-visible {
 }
 
 /* Fleet and driver controls retain the existing green and gold palette. */
+.map-tools { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.result-card > .btn { margin-top: 12px; }
 .prototype-notice { padding: 10px 24px; background: #fff4ce; color: #4e3b00; font-size: .86rem; text-align: center; border-bottom: 1px solid #eadba0; }
 .driver-main { padding-top: 38px; padding-bottom: 64px; max-width: 900px; }
 .driver-main > .section-intro { margin-bottom: 24px; }

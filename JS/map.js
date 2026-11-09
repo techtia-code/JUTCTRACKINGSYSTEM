@@ -1,9 +1,9 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { makeElement } from './dom.js';
-import { isFresh } from './fleet.js';
+import { elapsedSeconds, isFresh } from './fleet.js';
 import { fetchRoadLegs, positionOnRoads } from './roads.js';
-import { findPositionFromTravelled, getTravelledFromLocation, makeRoutePath } from './simulation.js';
+import { findPositionFromTravelled, makeRoutePath } from './simulation.js';
 
 const COLOURS = ['#0b6e4f', '#d98a00', '#b83b32', '#2563a8', '#7a3e9d'];
 export function initMap(routes, coordinates, buses = []) {
@@ -15,10 +15,21 @@ export function initMap(routes, coordinates, buses = []) {
   tiles.on('tileerror', () => { document.getElementById('fleet-message').textContent = 'Some map tiles could not load. Bus and route details remain available below.'; });
   const routeLayers = L.layerGroup().addTo(map), busLayers = L.layerGroup().addTo(map);
   let previousGeometry = '', fit = false, roadPaths = new Map();
-  function update(nextRoutes, nextCoordinates, nextBuses) {
+  let visibleRoutes = routes, visibleCoordinates = coordinates, visibleBuses = buses, roadFitView = null;
+  function fitVisible() {
+    const points = visibleRoutes.flatMap(route => roadPaths.get(route.id)?.flat() || route.stops.map(stop => visibleCoordinates[stop]).filter(Boolean));
+    points.push(...visibleBuses.filter(bus => Number.isFinite(bus.lat) && Number.isFinite(bus.lng)).map(bus => [bus.lat, bus.lng]));
+    if (!points.length) return;
+    map.invalidateSize({ pan: false });
+    map.fitBounds(L.latLngBounds(points), { padding: [24, 24], maxZoom: 15, animate: false });
+    fit = true; roadFitView = { center: map.getCenter(), zoom: map.getZoom() };
+  }
+  function update(nextRoutes, nextCoordinates, nextBuses, { fit: requestedFit = false } = {}) {
+    visibleRoutes = nextRoutes; visibleCoordinates = nextCoordinates; visibleBuses = nextBuses;
     const geometry = JSON.stringify([nextRoutes, nextCoordinates]);
     if (geometry !== previousGeometry) {
       previousGeometry = geometry;
+      roadFitView = null;
       roadPaths = new Map();
       routeLayers.clearLayers();
       const points = [];
@@ -29,16 +40,18 @@ export function initMap(routes, coordinates, buses = []) {
           fetchRoadLegs(path).then(legs => {
             if (!legs || geometry !== previousGeometry) return;
             roadPaths.set(route.id, legs); line.setLatLngs(legs.flat());
+            // Complete the selection fit after routing, unless the user moved the map.
+            if (roadFitView && map.getCenter().equals(roadFitView.center) && map.getZoom() === roadFitView.zoom) fitVisible();
           });
         }
       });
       [...new Set(nextRoutes.flatMap(r => r.stops))].forEach(stop => {
         if (nextCoordinates[stop]) L.circleMarker(nextCoordinates[stop], { radius: 5, color: '#1c2b26', fillColor: '#fff', fillOpacity: 1 }).bindTooltip(makeElement('span', '', stop)).addTo(routeLayers);
       });
-      if (!fit && points.length) { map.fitBounds(L.latLngBounds(points), { padding: [24, 24] }); fit = true; }
     }
-    busLayers.clearLayers(); sidebar.replaceChildren(makeElement('h3', 'bus-list-heading', 'Sample buses'));
-    if (!nextBuses.length) sidebar.append(makeElement('p', 'empty-state', 'No bus locations are available.'));
+    if (!fit || requestedFit) fitVisible();
+    busLayers.clearLayers(); sidebar.replaceChildren(makeElement('h3', 'bus-list-heading', nextRoutes.length === 1 ? nextRoutes[0].name : 'Buses on these routes'));
+    if (!nextBuses.length) sidebar.append(makeElement('p', 'empty-state', nextRoutes.length ? 'No buses are currently available on these routes.' : 'Search for a route or show all routes.'));
     const list = makeElement('ul', 'bus-list');
     nextBuses.forEach(bus => {
       const index = nextRoutes.findIndex(r => r.id === bus.routeId), colour = COLOURS[Math.max(0, index) % COLOURS.length];
@@ -46,7 +59,7 @@ export function initMap(routes, coordinates, buses = []) {
       let position = [bus.lat, bus.lng];
       if (bus.source !== 'driver' && roadPaths.has(bus.routeId) && nextRoutes[index]) {
         const route = nextRoutes[index], path = makeRoutePath(route, nextCoordinates);
-        const progress = bus.preview ? getTravelledFromLocation(path, position, 'outbound') : (bus.locationProgressSeconds ?? bus.progressSeconds ?? 0) * 8.3;
+        const progress = (bus.preview ? elapsedSeconds(bus) : (bus.locationProgressSeconds ?? bus.progressSeconds ?? 0)) * 8.3;
         position = positionOnRoads(findPositionFromTravelled(route, path, progress), roadPaths.get(bus.routeId));
       }
       if (Number.isFinite(position[0]) && Number.isFinite(position[1])) L.circleMarker(position, { radius: 9, color: '#fff', weight: 2, fillColor: colour, fillOpacity: bus.engineOn && isFresh(bus) ? 1 : 0.35 })

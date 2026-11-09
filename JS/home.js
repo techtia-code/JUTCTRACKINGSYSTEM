@@ -13,6 +13,7 @@ export async function initHome({ loadMap = () => import('./map.js') } = {}) {
   let alerts = loadedAlerts;
   let etaTime = null;
   let etaDetails = null;
+  let mapRouteIds = null, pendingMapFit = false;
 
   let stopCoordinates = Object.fromEntries(allStops.map(stop => [stop.name, [stop.lat, stop.lng]]));
   let stops = [...new Set(routes.flatMap(route => route.stops))];
@@ -27,6 +28,40 @@ export async function initHome({ loadMap = () => import('./map.js') } = {}) {
   const etaResults = document.getElementById("eta-results");
   const searchResults = document.getElementById("search-results");
   const alertsList = document.getElementById("alerts-list");
+
+  function updateMap(fit = false) {
+    const visibleRoutes = mapRouteIds === null ? routes : routes.filter(route => mapRouteIds.includes(route.id));
+    const visibleIds = new Set(visibleRoutes.map(route => route.id));
+    const visibleBuses = buses.filter(bus => visibleIds.has(bus.routeId));
+    document.getElementById('map-selection').textContent = mapRouteIds === null ? 'Showing all routes and buses.' :
+      !visibleRoutes.length ? 'No matching routes. Try another search or show all routes.' :
+      `Showing ${visibleRoutes.length === 1 ? visibleRoutes[0].name : `${visibleRoutes.length} matching routes`} · ${visibleBuses.length} ${visibleBuses.length === 1 ? 'bus' : 'buses'}.`;
+    document.getElementById('show-all-routes').hidden = mapRouteIds === null;
+    if (mapView) {
+      mapView.update(visibleRoutes, stopCoordinates, visibleBuses, { fit: fit || pendingMapFit });
+      pendingMapFit = false;
+    } else pendingMapFit ||= fit;
+  }
+
+  function showRoutesOnMap(ids, destination = null, scroll = true) {
+    mapRouteIds = ids.filter(id => routes.some(route => route.id === id));
+    const first = routes.find(route => route.id === mapRouteIds[0]);
+    if (first) {
+      const nextStop = first.stops.includes(destination) ? destination : routeSelect.value === first.id ? stopSelect.value : first.stops[0];
+      if (routeSelect.value !== first.id || stopSelect.value !== nextStop) clearWatch();
+      routeSelect.value = first.id; setEtaStops(nextStop);
+    }
+    updateMap(true);
+    if (scroll) {
+      const tracker = document.getElementById('tracker');
+      tracker.focus({ preventScroll: true });
+      tracker.scrollIntoView?.({ behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+    }
+  }
+
+  document.getElementById('show-all-routes').addEventListener('click', () => {
+    routeFilter.value = ''; renderRoutes(); mapRouteIds = null; updateMap(true);
+  });
 
   stops.forEach(stop => stopList.append(makeElement("option", "", stop)));
 
@@ -54,7 +89,7 @@ export async function initHome({ loadMap = () => import('./map.js') } = {}) {
     }
   }
 
-  function setEtaStops() {
+  function setEtaStops(preferredStop = null) {
     const route = routes.find(item => item.id === routeSelect.value);
     stopSelect.replaceChildren();
     populateBusSelect();
@@ -71,6 +106,7 @@ export async function initHome({ loadMap = () => import('./map.js') } = {}) {
       option.value = stop;
       stopSelect.append(option);
     });
+    if (route.stops.includes(preferredStop)) stopSelect.value = preferredStop;
     renderEtas();
   }
 
@@ -91,16 +127,24 @@ export async function initHome({ loadMap = () => import('./map.js') } = {}) {
       const stopListElement = makeElement("ul", "route-stops");
       route.stops.forEach(stop => stopListElement.append(makeElement("li", "", stop)));
       card.append(heading, details, stopListElement);
+      const view = makeElement('button', 'btn btn-secondary', 'View buses on map'); view.type = 'button';
+      view.addEventListener('click', () => showRoutesOnMap([route.id])); card.append(view);
       routeList.append(card);
       return { route, card };
     });
     routeList.append(noMatches);
 
-    routeFilter.oninput = () => {
+    function filterCards() {
       cards.forEach(({ route, card }) => {
         card.hidden = !routeMatchesSearch(route, routeFilter.value);
       });
       noMatches.hidden = cards.some(({ card }) => !card.hidden);
+    }
+    filterCards();
+    routeFilter.oninput = () => {
+      filterCards();
+      if (routeFilter.value.trim()) showRoutesOnMap(cards.filter(({ card }) => !card.hidden).map(({ route }) => route.id), null, false);
+      else { mapRouteIds = null; updateMap(true); }
     };
   }
 
@@ -124,6 +168,8 @@ export async function initHome({ loadMap = () => import('./map.js') } = {}) {
         makeElement("h3", "", route.name),
         makeElement("p", "", path.join(" to "))
       );
+      const view = makeElement('button', 'btn btn-secondary', 'View buses on map'); view.type = 'button';
+      view.addEventListener('click', () => showRoutesOnMap([route.id], path.at(-1))); card.append(view);
       searchResults.append(card);
     });
   }
@@ -242,8 +288,12 @@ export async function initHome({ loadMap = () => import('./map.js') } = {}) {
         setEtaStops(); if (routes.find(r => r.id === routeSelect.value)?.stops.includes(stopName)) stopSelect.value = stopName;
       }
       populateBusSelect(); updateEta();
-      document.getElementById('fleet-message').textContent = 'Bus locations refresh every five seconds. Parked buses have no arrival estimate.';
-      mapView?.update(routes, stopCoordinates, buses);
+      if (mapRouteIds?.length) {
+        mapRouteIds = mapRouteIds.filter(id => routes.some(route => route.id === id));
+        if (!mapRouteIds.length) mapRouteIds = null;
+      }
+      document.getElementById('fleet-message').textContent = 'Simulated buses run automatically and refresh every five seconds. Drivers can park or restart their buses.';
+      updateMap();
     } catch (error) {
       console.error('Could not refresh fleet', error);
       document.getElementById('fleet-message').textContent = 'Bus tracking is unavailable. Route searches and service information may still be available. Ask the administrator to check the connection and database setup.';
@@ -270,6 +320,7 @@ export async function initHome({ loadMap = () => import('./map.js') } = {}) {
       return;
     }
     renderJourneyResults(result.matches);
+    showRoutesOnMap(result.matches.map(({ route }) => route.id), result.matches[0]?.path.at(-1), result.matches.length > 0);
   });
   function clearWatch(reason) { watching = false; watchedSelection = null; delivered.clear(); notificationList.replaceChildren(); document.getElementById('stop-watch').hidden = true; document.getElementById('watch-bus').disabled = false; if (reason) notificationMessage.textContent = reason; }
   routeSelect.addEventListener('change', () => { clearWatch(); setEtaStops(); });
@@ -292,7 +343,11 @@ export async function initHome({ loadMap = () => import('./map.js') } = {}) {
 
   // Loaded on demand so the admin page does not download Leaflet.
   loadMap()
-    .then(({ initMap }) => { mapView = initMap(routes, stopCoordinates, buses); })
+    .then(({ initMap }) => {
+      const visibleRoutes = mapRouteIds === null ? routes : routes.filter(route => mapRouteIds.includes(route.id));
+      mapView = initMap(visibleRoutes, stopCoordinates, buses.filter(bus => visibleRoutes.some(route => route.id === bus.routeId)));
+      updateMap();
+    })
     .catch(error => {
       console.error("Could not load the map.", error);
       document.querySelector(".map-sidebar").replaceChildren(

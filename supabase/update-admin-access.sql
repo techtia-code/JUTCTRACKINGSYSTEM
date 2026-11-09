@@ -32,7 +32,7 @@ $$;
 
 drop policy if exists "Read own role or admin" on public.user_roles;
 create policy "Read own role or admin" on public.user_roles for select to authenticated
-  using (user_id = auth.uid() or public.is_admin());
+  using (user_id = auth.uid());
 grant select on public.user_roles to authenticated;
 revoke insert, update, delete on public.user_roles from anon, authenticated;
 

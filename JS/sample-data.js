@@ -12,8 +12,8 @@ export function makeSampleData(now = Date.now()) {
     ['Cross Roads to Papine', ['Cross Roads', 'Half-Way Tree', 'Liguanea', 'Papine']]
   ].map(([name, stops], i) => ({ id: `route-${i + 1}`, name, stops }));
   const buses = [...routes, routes[0]].map((route, i) => ({
-    id: `bus-${i + 1}`, label: `JUTC-DEMO-${String(i + 1).padStart(2, '0')}`, routeId: route.id,
-    engineOn: true, status: 'on_time', startedAt: new Date(now).toISOString(), progressSeconds: i * 90,
+    id: `bus-${i + 1}`, label: `JUTC-${1001 + i}`, routeId: route.id,
+    engineOn: true, autonomousSimulation: true, status: 'on_time', startedAt: new Date(now).toISOString(), progressSeconds: i * 90,
     locationProgressSeconds: i * 90, updatedAt: new Date(now).toISOString(), preview: true,
     lat: stops.find(s => s.name === route.stops[0]).lat, lng: stops.find(s => s.name === route.stops[0]).lng
   }));

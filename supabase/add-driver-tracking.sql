@@ -36,8 +36,6 @@ drop policy if exists "Drivers can see their own route" on drivers;
 create policy "Drivers can see their own route" on drivers for select to authenticated
   using (user_id = (select auth.uid()));
 drop policy if exists "Administrators can see drivers" on drivers;
-create policy "Administrators can see drivers" on drivers for select to authenticated
-  using (is_admin());
 -- Anyone can read bus locations. Nobody writes them directly: only through
 -- share_bus_location() and stop_sharing_location() below.
 drop policy if exists "Anyone can read bus locations" on bus_locations;

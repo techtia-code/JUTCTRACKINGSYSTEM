@@ -21,6 +21,28 @@ test('different buses on the same route have independent positions', () => {
   assert.notEqual(fleet.simulateBus(bus, route, coordinates, now).lat,
     fleet.simulateBus({ ...bus, progressSeconds: 80 }, route, coordinates, now).lat);
 });
+
+test('autonomous simulation advances without a driver publishing locations', () => {
+  assert.equal(typeof fleet.projectSimulatedBus, 'function');
+  const saved = { ...bus, autonomousSimulation: true, updatedAt: new Date(now - 3600000).toISOString() };
+  const first = fleet.projectSimulatedBus(saved, route, coordinates, now);
+  const later = fleet.projectSimulatedBus(saved, route, coordinates, now + 5000);
+  assert.notEqual(first.lat, later.lat);
+  assert.equal(first.source, 'simulation');
+  assert.equal(fleet.isFresh(first, now), true);
+  assert.notEqual(fleet.busEtaMinutes(first, route, coordinates, 'C', 0, now), null);
+  assert.equal(saved.updatedAt, new Date(now - 3600000).toISOString(), 'projection must not rewrite the saved state');
+});
+
+test('manual stop stays frozen and driver feeds do not gain simulated freshness', () => {
+  assert.equal(typeof fleet.projectSimulatedBus, 'function');
+  const stopped = { ...bus, autonomousSimulation: true, engineOn: false, startedAt: null, progressSeconds: 60 };
+  assert.deepEqual(fleet.projectSimulatedBus(stopped, route, coordinates, now + 300000), stopped);
+  assert.equal(fleet.busEtaMinutes(stopped, route, coordinates, 'C', 0, now), null);
+  const driverFeed = { ...bus, source: 'driver', updatedAt: new Date(now - 61000).toISOString() };
+  assert.deepEqual(fleet.projectSimulatedBus(driverFeed, route, coordinates, now), driverFeed);
+  assert.equal(fleet.isFresh(driverFeed, now), false);
+});
 test('passenger ETA uses the selected bus progress and includes delay', () => {
   assert.equal(typeof fleet.busEtaMinutes, 'function');
   assert.equal(fleet.busEtaMinutes({ ...bus, engineOn: false }, route, coordinates, 'C', 0, now), null);

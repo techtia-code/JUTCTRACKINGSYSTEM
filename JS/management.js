@@ -19,7 +19,6 @@ function panel(title, id) {
 }
 function submit(form, text) { const button = makeElement('button', 'btn btn-primary', text); button.type = 'submit'; form.append(button); return button; }
 function option(select, value, name) { const item = makeElement('option', '', name); item.value = value; select.append(item); }
-function validDriver(value) { return !value || (isDemoMode() ? value === 'demo-driver' : /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)); }
 
 export async function initFleetManagement() {
   if (document.getElementById('fleet-management')) return;
@@ -40,17 +39,18 @@ export async function initFleetManagement() {
     });
   }
   const fleet = panel('Add a bus', 'fleet-management');
-  fleet.section.prepend(makeElement('p', 'fine-print', 'Sample buses start parked. Start a bus in the driver console to publish simulated locations.'));
+  fleet.section.prepend(makeElement('p', 'fine-print', 'Simulated buses run automatically. Drivers can stop or restart them from the driver console.'));
   const label = field(fleet.form, 'Bus label', 'new-bus-label'); label.maxLength = 60;
   const route = field(fleet.form, 'Route', 'new-bus-route', 'select');
   routes.forEach(r => option(route, r.id, r.name));
-  const driver = field(fleet.form, 'Driver account ID (optional)', 'new-bus-driver'); driver.required = false;
-  driver.placeholder = isDemoMode() ? 'demo-driver' : 'UUID from Supabase Authentication';
+  const driver = field(fleet.form, 'Driver name or email (optional)', 'new-bus-driver'); driver.required = false; driver.maxLength = 254;
+  driver.placeholder = isDemoMode() ? 'Demo Driver or driver@jutc.example.invalid' : 'Full name or email address';
   const busSave = submit(fleet.form, 'Add bus');
   const assignment = panel('Assign a driver', 'assignment-management');
   const busSelect = field(assignment.form, 'Bus', 'assign-bus', 'select');
-  const driverId = field(assignment.form, 'Driver account ID (leave empty to unassign)', 'assign-driver'); driverId.required = false;
-  driverId.placeholder = driver.placeholder;
+  const assignedDriver = field(assignment.form, 'Driver name or email (leave empty to unassign)', 'assign-driver'); assignedDriver.required = false; assignedDriver.maxLength = 254;
+  assignedDriver.placeholder = driver.placeholder;
+  assignment.section.append(makeElement('p', 'fine-print', 'Use an existing driver account. If more than one driver has the same name, use their email address. Stop a running bus before changing its driver.'));
   const assignSave = submit(assignment.form, 'Save assignment');
   const list = makeElement('ul', 'fleet-list'); assignment.section.append(list);
   async function refresh() {
@@ -58,23 +58,24 @@ export async function initFleetManagement() {
     busSelect.replaceChildren(); list.replaceChildren();
     buses.forEach(b => {
       option(busSelect, b.id, b.label);
-      const driver = assignments.find(a => a.busId === b.id)?.driverId || 'Unassigned';
+      const assigned = assignments.find(a => a.busId === b.id);
+      const driver = assigned ? assigned.driverName || assigned.driverEmail || 'Driver' : 'Unassigned';
       list.append(makeElement('li', '', `${b.label} · ${routes.find(r => r.id === b.routeId)?.name || 'Unknown route'} · ${b.engineOn ? 'Engine on' : 'Parked'} · Driver: ${driver}`));
     });
-    function setDriver() { driverId.value = assignments.find(a => a.busId === busSelect.value)?.driverId || ''; }
+    function setDriver() { const assigned = assignments.find(a => a.busId === busSelect.value); assignedDriver.value = assigned?.driverEmail || assigned?.driverName || ''; }
     busSelect.onchange = setDriver; setDriver();
     assignSave.disabled = !buses.length;
   }
   fleet.form.addEventListener('submit', async event => {
-    event.preventDefault(); if (!validDriver(driver.value.trim())) { fleet.feedback.textContent = 'Enter a valid driver account ID.'; return; }
+    event.preventDefault();
     busSave.disabled = true;
     try { await saveBus(label.value, route.value, driver.value.trim()); fleet.form.reset(); await refresh(); fleet.feedback.textContent = 'Bus added.'; }
     catch (error) { fleet.feedback.textContent = error.message; } finally { busSave.disabled = false; }
   });
   assignment.form.addEventListener('submit', async event => {
-    event.preventDefault(); if (!validDriver(driverId.value.trim())) { assignment.feedback.textContent = 'Enter a valid driver account ID.'; return; }
+    event.preventDefault();
     assignSave.disabled = true;
-    try { await assignBus(busSelect.value, driverId.value.trim()); await refresh(); assignment.feedback.textContent = 'Driver assignment saved.'; }
+    try { await assignBus(busSelect.value, assignedDriver.value.trim()); await refresh(); assignment.feedback.textContent = 'Driver assignment saved.'; }
     catch (error) { assignment.feedback.textContent = error.message; } finally { assignSave.disabled = false; }
   });
   await refresh();
