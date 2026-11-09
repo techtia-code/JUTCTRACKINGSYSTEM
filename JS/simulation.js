@@ -33,17 +33,90 @@ export function makeRoutePath(route, stopCoordinates) {
   return { points, distances };
 }
 
-// Each bus runs to the end of its route and back. Using the clock means
-// every open tab shows the buses in the same place.
-function getTravelledMetres(path, time) {
-  const routeLength = path.distances[path.distances.length - 1];
-  return (time / 1000 * AVERAGE_SPEED_METRES_PER_SECOND) % (routeLength * 2);
+function getRouteLength(path) {
+  return path.distances[path.distances.length - 1];
+}
+
+// A bus runs to the end of its route and back, so its trip is described by
+// the metres travelled on that round trip: from 0 at the first stop, to the
+// route length at the last stop, to twice the route length back at the start.
+function normaliseTravelled(path, travelled) {
+  const roundTrip = getRouteLength(path) * 2;
+  return ((travelled % roundTrip) + roundTrip) % roundTrip;
+}
+
+// The simulated bus. Using the clock means every open tab shows the bus in
+// the same place.
+export function getSimulatedTravelled(path, time) {
+  return normaliseTravelled(path, time / 1000 * AVERAGE_SPEED_METRES_PER_SECOND);
+}
+
+// How far along the route (from the first stop) the point on the route line
+// nearest to latLng is. Over a few kilometres the earth is flat enough to
+// treat latitude and longitude as x and y in metres.
+export function getDistanceAlongRoute(path, latLng) {
+  const { points, distances } = path;
+  const metresPerDegree = EARTH_RADIUS_METRES * Math.PI / 180;
+  const lngScale = Math.cos(toRadians(latLng[0]));
+  let best = { gap: Infinity, along: 0 };
+
+  for (let index = 1; index < points.length; index++) {
+    const from = points[index - 1];
+    const to = points[index];
+    const segmentX = (to[1] - from[1]) * lngScale * metresPerDegree;
+    const segmentY = (to[0] - from[0]) * metresPerDegree;
+    const pointX = (latLng[1] - from[1]) * lngScale * metresPerDegree;
+    const pointY = (latLng[0] - from[0]) * metresPerDegree;
+    const lengthSquared = segmentX ** 2 + segmentY ** 2;
+    const share = lengthSquared === 0
+      ? 0
+      : Math.min(Math.max((pointX * segmentX + pointY * segmentY) / lengthSquared, 0), 1);
+    const gap = Math.hypot(pointX - share * segmentX, pointY - share * segmentY);
+    if (gap < best.gap) {
+      best = { gap, along: distances[index - 1] + share * (distances[index] - distances[index - 1]) };
+    }
+  }
+  return best.along;
+}
+
+// A shared location turned into metres travelled on the round trip.
+export function getTravelledFromLocation(path, latLng, direction) {
+  const along = getDistanceAlongRoute(path, latLng);
+  return normaliseTravelled(path, direction === "inbound" ? getRouteLength(path) * 2 - along : along);
+}
+
+// Which way a bus is going, from two positions along its route. Moves under
+// 20 metres are GPS noise, so the direction stays as it was.
+const DIRECTION_NOISE_METRES = 20;
+
+export function getDirectionFromMove(previousAlong, along, previousDirection) {
+  if (previousAlong === null || previousAlong === undefined) return previousDirection;
+  if (along - previousAlong > DIRECTION_NOISE_METRES) return "outbound";
+  if (previousAlong - along > DIRECTION_NOISE_METRES) return "inbound";
+  return previousDirection;
+}
+
+export function getDirectionFromTravelled(path, travelled) {
+  return normaliseTravelled(path, travelled) < getRouteLength(path) ? "outbound" : "inbound";
+}
+
+// Where a route's bus is: the driver's shared location when there is one,
+// otherwise the simulation.
+export function getBusTravelled(path, liveLocation, time) {
+  if (liveLocation) {
+    return { travelled: getTravelledFromLocation(path, liveLocation.latLng, liveLocation.direction), live: true };
+  }
+  return { travelled: getSimulatedTravelled(path, time), live: false };
 }
 
 export function findBusPosition(route, path, time) {
+  return findPositionFromTravelled(route, path, getSimulatedTravelled(path, time));
+}
+
+export function findPositionFromTravelled(route, path, travelledMetres) {
   const { points, distances } = path;
-  const routeLength = distances[distances.length - 1];
-  const travelled = getTravelledMetres(path, time);
+  const routeLength = getRouteLength(path);
+  const travelled = normaliseTravelled(path, travelledMetres);
   const outbound = travelled < routeLength;
   const distance = outbound ? travelled : routeLength * 2 - travelled;
 
@@ -54,7 +127,10 @@ export function findBusPosition(route, path, time) {
 
   return {
     latLng: [from[0] + (to[0] - from[0]) * progress, from[1] + (to[1] - from[1]) * progress],
-    nextStop: route.stops[outbound ? segment : segment - 1]
+    nextStop: route.stops[outbound ? segment : segment - 1],
+    // Which pair of stops the bus is between, and how far (0 to 1) from the first.
+    leg: segment - 1,
+    progress
   };
 }
 
@@ -64,16 +140,24 @@ export function getDelayMinutes(alerts, routeId) {
     .reduce((total, alert) => total + alert.delayMinutes, 0);
 }
 
-// ETA = (distance / average speed) + traffic delay
-export function getEtaMinutes(route, path, stop, time, delayMinutes) {
-  const roundTrip = path.distances[path.distances.length - 1] * 2;
+// How far the bus still has to drive to reach the stop. It passes each stop
+// twice per round trip, once in each direction, so take the nearer pass.
+export function getMetresToStop(route, path, stop, travelledMetres) {
+  const roundTrip = getRouteLength(path) * 2;
   const stopDistance = path.distances[route.stops.indexOf(stop)];
-  const travelled = getTravelledMetres(path, time);
+  const travelled = normaliseTravelled(path, travelledMetres);
 
-  // The bus passes each stop twice per round trip, once in each direction.
   const toOutboundPass = (stopDistance - travelled + roundTrip) % roundTrip;
   const toInboundPass = (roundTrip - stopDistance - travelled + roundTrip) % roundTrip;
-  const distance = Math.min(toOutboundPass, toInboundPass);
+  return Math.min(toOutboundPass, toInboundPass);
+}
 
+// ETA = (distance / average speed) + traffic delay
+export function getEtaFromTravelled(route, path, stop, travelledMetres, delayMinutes) {
+  const distance = getMetresToStop(route, path, stop, travelledMetres);
   return Math.round(distance / AVERAGE_SPEED_METRES_PER_SECOND / 60) + delayMinutes;
+}
+
+export function getEtaMinutes(route, path, stop, time, delayMinutes) {
+  return getEtaFromTravelled(route, path, stop, getSimulatedTravelled(path, time), delayMinutes);
 }

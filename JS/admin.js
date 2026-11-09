@@ -2,24 +2,31 @@ import {
   ALERT_TYPES,
   deleteAlert,
   deleteRoute,
+  deleteStop,
   getSession,
+  isAdmin,
   loadAlerts,
   loadRoutes,
   loadStops,
   logIn,
   logOut,
   saveAlert,
-  saveRoute
+  saveRoute,
+  saveStop
 } from "./data.js";
 import { demoLogIn } from './data.js';
 import { isDemoMode } from './supabase.js';
 import { initFleetManagement } from './management.js';
-import { makeElement, makeIcon, setHeading } from "./dom.js";
-import { validateAlert, validateRoute } from "./planner.js";
+import { makeElement, makeIcon, setHeading, setMessage } from "./dom.js";
+import { validateAlert, validateRoute, validateStop } from "./planner.js";
 
-function setMessage(element, text, isError) {
-  element.textContent = text;
-  element.classList.toggle("error", Boolean(isError));
+function makeEditButton(label, title) {
+  const button = makeElement("button", "admin-icon-button");
+  button.type = "button";
+  button.setAttribute("aria-label", label);
+  button.title = title;
+  button.prepend(makeIcon("pencil"));
+  return button;
 }
 
 function makeDeleteButton(label, title) {
@@ -33,7 +40,8 @@ function makeDeleteButton(label, title) {
 
 async function initManagement() {
   const [allStops, routes, alerts] = await Promise.all([loadStops(), loadRoutes(), loadAlerts()]);
-  const validStops = allStops.map(stop => stop.name);
+  let currentStops = allStops;
+  let validStops = allStops.map(stop => stop.name);
   let currentRoutes = routes;
   let currentAlerts = alerts;
   let editingId = null;
@@ -52,8 +60,23 @@ async function initManagement() {
   const alertDelay = document.getElementById("alert-delay");
   const alertFeedback = document.getElementById("alert-feedback");
   const alertList = document.getElementById("admin-alerts");
+  const stopForm = document.getElementById("stop-form");
+  const stopNameInput = document.getElementById("stop-name");
+  const stopLatInput = document.getElementById("stop-lat");
+  const stopLngInput = document.getElementById("stop-lng");
+  const saveStopButton = document.getElementById("save-stop");
+  const cancelStopButton = document.getElementById("cancel-stop-edit");
+  const stopMessage = document.getElementById("stop-message");
+  const stopList = document.getElementById("admin-stops");
+  const stopCount = document.getElementById("stop-count");
+  let editingStopId = null;
 
-  document.getElementById("available-stops").textContent = validStops.join(", ");
+  function refreshStopNames() {
+    validStops = currentStops.map(stop => stop.name);
+    document.getElementById("available-stops").textContent = validStops.join(", ");
+  }
+
+  refreshStopNames();
 
   Object.entries(ALERT_TYPES).forEach(([value, label]) => {
     const option = makeElement("option", "", label);
@@ -83,6 +106,8 @@ async function initManagement() {
   function renderAdminRoutes() {
     window.dispatchEvent(new window.Event('jutc:routes-changed'));
     populateAlertRoutes();
+    // Each stop shows how many routes use it.
+    renderAdminStops();
     list.replaceChildren();
     count.textContent = currentRoutes.length + (currentRoutes.length === 1 ? " route" : " routes");
     if (currentRoutes.length === 0) {
@@ -137,6 +162,82 @@ async function initManagement() {
     });
   }
 
+  function resetStopForm() {
+    editingStopId = null;
+    stopForm.reset();
+    saveStopButton.replaceChildren(makeIcon("plus"), document.createTextNode(" Add stop"));
+    cancelStopButton.hidden = true;
+    setHeading(document.getElementById("stop-form-heading"), "plus", "Add a stop");
+  }
+
+  function routesUsing(stop) {
+    return currentRoutes.filter(route => route.stops.includes(stop.name));
+  }
+
+  function renderAdminStops() {
+    stopList.replaceChildren();
+    stopCount.textContent = currentStops.length + (currentStops.length === 1 ? " stop" : " stops");
+    if (currentStops.length === 0) {
+      stopList.append(makeElement("p", "empty-state", "No stops have been added."));
+      return;
+    }
+
+    currentStops.forEach(stop => {
+      const card = makeElement("article", "admin-route");
+      const details = makeElement("div", "admin-route-details");
+      const used = routesUsing(stop).length;
+      details.append(
+        makeElement("h3", "", stop.name),
+        makeElement("p", "muted-copy",
+          stop.lat.toFixed(4) + ", " + stop.lng.toFixed(4) + " - " +
+          (used === 0 ? "not on any route" : "on " + used + (used === 1 ? " route" : " routes")))
+      );
+
+      const editButton = makeEditButton("Edit " + stop.name, "Edit stop");
+      editButton.addEventListener("click", () => {
+        editingStopId = stop.id;
+        stopNameInput.value = stop.name;
+        stopLatInput.value = stop.lat;
+        stopLngInput.value = stop.lng;
+        saveStopButton.replaceChildren(makeIcon("pencil"), document.createTextNode(" Save changes"));
+        cancelStopButton.hidden = false;
+        setHeading(document.getElementById("stop-form-heading"), "pencil", "Edit stop");
+        setMessage(stopMessage, "Editing " + stop.name + ". Routes that use it change with it.", false);
+        stopNameInput.focus();
+      });
+
+      const deleteButton = makeDeleteButton("Delete " + stop.name, "Delete stop");
+      deleteButton.addEventListener("click", async () => {
+        // The database refuses too (route_stops refers to the stop), but
+        // naming the routes here tells the administrator what to change.
+        const usedBy = routesUsing(stop);
+        if (usedBy.length > 0) {
+          setMessage(stopMessage,
+            stop.name + " is on " + usedBy.map(route => route.name).join(", ") + ". Remove it from those routes first.", true);
+          return;
+        }
+        if (!window.confirm("Delete the stop \"" + stop.name + "\"?")) return;
+        try {
+          await deleteStop(stop.id);
+          currentStops = await loadStops();
+        } catch (error) {
+          console.error("Could not delete the stop.", error);
+          setMessage(stopMessage, "The stop could not be deleted. " + error.message, true);
+          return;
+        }
+        if (editingStopId === stop.id) resetStopForm();
+        refreshStopNames();
+        renderAdminStops();
+        setMessage(stopMessage, "Stop deleted.", false);
+      });
+
+      const actions = makeElement("div", "admin-route-actions");
+      actions.append(editButton, deleteButton);
+      card.append(details, actions);
+      stopList.append(card);
+    });
+  }
+
   function renderAdminAlerts() {
     alertList.replaceChildren();
     if (currentAlerts.length === 0) {
@@ -183,7 +284,7 @@ async function initManagement() {
 
     saveButton.disabled = true;
     try {
-      await saveRoute(editingId, result.name, result.stops, allStops);
+      await saveRoute(editingId, result.name, result.stops);
       currentRoutes = await loadRoutes();
     } catch (error) {
       console.error("Could not save the sample route.", error);
@@ -201,6 +302,39 @@ async function initManagement() {
   cancelButton.addEventListener("click", () => {
     resetForm();
     setMessage(message, "", false);
+  });
+
+  stopForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const result = validateStop(stopNameInput.value, stopLatInput.value, stopLngInput.value, currentStops, editingStopId);
+    if (result.error) {
+      setMessage(stopMessage, result.error, true);
+      ({ name: stopNameInput, lat: stopLatInput, lng: stopLngInput })[result.field].focus();
+      return;
+    }
+
+    saveStopButton.disabled = true;
+    try {
+      await saveStop(editingStopId, result.name, result.lat, result.lng);
+      // A renamed stop changes the routes that use it.
+      [currentStops, currentRoutes] = await Promise.all([loadStops(), loadRoutes()]);
+    } catch (error) {
+      console.error("Could not save the stop.", error);
+      setMessage(stopMessage, "The stop could not be saved. " + error.message, true);
+      return;
+    } finally {
+      saveStopButton.disabled = false;
+    }
+
+    resetStopForm();
+    refreshStopNames();
+    renderAdminRoutes();
+    setMessage(stopMessage, "Stop saved. You can now use it in a route.", false);
+  });
+
+  cancelStopButton.addEventListener("click", () => {
+    resetStopForm();
+    setMessage(stopMessage, "", false);
   });
 
   alertForm.addEventListener("submit", async event => {
@@ -237,6 +371,7 @@ async function initManagement() {
   });
 
   resetForm();
+  resetStopForm();
   renderAdminRoutes();
   renderAdminAlerts();
 }
@@ -271,6 +406,11 @@ function showLogin() {
     setMessage(message, "", false);
     try {
       await logIn(document.getElementById("login-email").value.trim(), document.getElementById("login-password").value);
+      if (!await isAdmin()) {
+        await logOut();
+        setMessage(message, "This account is not an administrator.", true);
+        return;
+      }
       await showManagement();
     } catch (error) {
       console.error("Could not log in.", error);

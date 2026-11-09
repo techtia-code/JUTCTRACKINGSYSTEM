@@ -261,10 +261,10 @@ function PageSkeleton({ page }) {
       className="fixed inset-0 z-[3000] overflow-y-auto bg-[#f5f7f6] text-[#1c2b26]"
     >
       <span className="sr-only">
-        {page === "admin" ? "Loading route management" : "Loading the journey planner"}
+        {page === "admin" ? "Loading route management" : page === "driver" ? "Loading the driver page" : "Loading the journey planner"}
       </span>
-      <NavigationSkeleton admin={page === "admin"} />
-      {page === "admin" ? <AdminSkeleton /> : <HomeSkeleton reduceMotion={reduceMotion} />}
+      <NavigationSkeleton admin={page !== "home"} />
+      {page === "home" ? <HomeSkeleton reduceMotion={reduceMotion} /> : <AdminSkeleton />}
     </div>
   );
 }

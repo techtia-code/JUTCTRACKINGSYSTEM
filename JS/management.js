@@ -22,21 +22,23 @@ function option(select, value, name) { const item = makeElement('option', '', na
 function validDriver(value) { return !value || (isDemoMode() ? value === 'demo-driver' : /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)); }
 
 export async function initFleetManagement() {
-  if (document.getElementById('stop-management')) return;
+  if (document.getElementById('fleet-management')) return;
   const stops = await loadStops();
   let routes = await loadRoutes();
-  const stopPanel = panel('Add a bus stop', 'stop-management');
-  const name = field(stopPanel.form, 'Stop name', 'new-stop-name'); name.maxLength = 100;
-  const lat = field(stopPanel.form, 'Latitude', 'new-stop-lat', 'number'); lat.min = '-90'; lat.max = '90'; lat.step = 'any';
-  const lng = field(stopPanel.form, 'Longitude', 'new-stop-lng', 'number'); lng.min = '-180'; lng.max = '180'; lng.step = 'any';
-  const stopSave = submit(stopPanel.form, 'Add stop');
-  stopPanel.form.addEventListener('submit', async event => {
-    event.preventDefault(); const value = validateStop(name.value, lat.value, lng.value, stops);
-    if (value.error) { stopPanel.feedback.textContent = value.error; return; }
-    stopSave.disabled = true;
-    try { await saveStop(value.name, value.lat, value.lng); window.location.reload(); }
-    catch (error) { stopPanel.feedback.textContent = error.message; } finally { stopSave.disabled = false; }
-  });
+  if (!document.getElementById('stop-form')) {
+    const stopPanel = panel('Add a bus stop', 'stop-management');
+    const name = field(stopPanel.form, 'Stop name', 'new-stop-name'); name.maxLength = 100;
+    const lat = field(stopPanel.form, 'Latitude', 'new-stop-lat', 'number'); lat.min = '-90'; lat.max = '90'; lat.step = 'any';
+    const lng = field(stopPanel.form, 'Longitude', 'new-stop-lng', 'number'); lng.min = '-180'; lng.max = '180'; lng.step = 'any';
+    const stopSave = submit(stopPanel.form, 'Add stop');
+    stopPanel.form.addEventListener('submit', async event => {
+      event.preventDefault(); const value = validateStop(name.value, lat.value, lng.value, stops);
+      if (value.error) { stopPanel.feedback.textContent = value.error; return; }
+      stopSave.disabled = true;
+      try { await saveStop(value.name, value.lat, value.lng); window.location.reload(); }
+      catch (error) { stopPanel.feedback.textContent = error.message; } finally { stopSave.disabled = false; }
+    });
+  }
   const fleet = panel('Add a bus', 'fleet-management');
   fleet.section.prepend(makeElement('p', 'fine-print', 'Sample buses start parked. Start a bus in the driver console to publish simulated locations.'));
   const label = field(fleet.form, 'Bus label', 'new-bus-label'); label.maxLength = 60;

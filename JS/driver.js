@@ -1,4 +1,4 @@
-import { demoLogIn, getSession, loadAssignedBuses, loadRoutes, logIn, logOut, updateBus } from './data.js';
+import { demoLogIn, getSession, loadAssignedBuses, loadMyRoute, loadRoutes, logIn, logOut, updateBus } from './data.js';
 import { BUS_UPDATE_INTERVAL_MS } from './fleet.js';
 import { makeElement } from './dom.js';
 import { isDemoMode } from './supabase.js';
@@ -7,7 +7,7 @@ export async function initDriver() {
   const select = document.getElementById('driver-bus'), details = document.getElementById('driver-bus-details');
   const feedback = document.getElementById('driver-feedback'), start = document.getElementById('engine-start'), stop = document.getElementById('engine-stop');
   const saveStatus = document.getElementById('driver-save-status'), status = document.getElementById('driver-status');
-  let buses = [], routes = [], busy = false, timer;
+  let buses = [], routes = [], busy = false, timer, stopRouteSharing = null;
   function message(text, error = false) { feedback.textContent = text; feedback.classList.toggle('error', error); }
   function render() {
     const bus = buses.find(b => b.id === select.value);
@@ -30,7 +30,9 @@ export async function initDriver() {
     const session = await getSession();
     if (!session || !['driver', 'admin'].includes(session.role)) throw new Error('This account needs a driver or administrator role. Ask the project owner to assign it.');
     routes = await loadRoutes(); await refresh();
-    document.getElementById('driver-login').hidden = true; document.getElementById('driver-console').hidden = false;
+    const sharedRoute = await loadMyRoute();
+    if (sharedRoute && !stopRouteSharing) stopRouteSharing = await (await import('./route-sharing.js')).initRouteSharing(sharedRoute);
+    document.getElementById('driver-login').hidden = true; document.getElementById('driver-console').hidden = Boolean(sharedRoute && !buses.length);
     document.getElementById('driver-sign-out').hidden = false;
     clearInterval(timer);
     timer = setInterval(async () => {
@@ -56,6 +58,7 @@ export async function initDriver() {
   document.getElementById('driver-sign-out').addEventListener('click', async () => {
     if (busy) return; busy = true;
     try {
+      if (stopRouteSharing) await stopRouteSharing();
       // Stop owned running buses before ending the session so they do not appear to keep moving.
       const session = await getSession();
       if (session && ['admin', 'driver'].includes(session.role)) for (const bus of (await loadAssignedBuses()).filter(b => b.engineOn && !b.preview)) await updateBus(bus.id, 'stop');

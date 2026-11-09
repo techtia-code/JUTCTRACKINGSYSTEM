@@ -1,6 +1,6 @@
 import { makeSampleData } from './sample-data.js';
-import { elapsedSeconds, simulateBus, validateStop } from './fleet.js';
-import { validateAlert, validateRoute } from './planner.js';
+import { elapsedSeconds, simulateBus } from './fleet.js';
+import { validateAlert, validateRoute, validateStop } from './planner.js';
 import { makeRoutePath } from './simulation.js';
 
 const DATA_KEY = 'jutc-demo-data-v1';
@@ -47,6 +47,30 @@ export function createDemoStore({ storage, sessionStorage, now = Date.now }) {
     saveStop(name, lat, lng) {
       admin(); return mutate(state => { const value = validateStop(name, lat, lng, state.stops); if (value.error) throw new Error(value.error);
         state.stops.push({ id: id(), ...value }); });
+    },
+    updateStop(stopId, name, lat, lng) {
+      admin(); return mutate(state => {
+        const stop = state.stops.find(s => s.id === stopId); if (!stop) throw new Error('Stop not found.');
+        const value = validateStop(name, lat, lng, state.stops, stopId);
+        if (value.error) throw new Error(value.error);
+        const oldName = stop.name;
+        const affected = state.routes.filter(route => route.stops.includes(oldName));
+        const coords = Object.fromEntries(state.stops.map(s => [s.id === stopId ? value.name : s.name, s.id === stopId ? [value.lat, value.lng] : [s.lat, s.lng]]));
+        for (const route of affected) makeRoutePath({ ...route, stops: route.stops.map(n => n === oldName ? value.name : n) }, coords);
+        Object.assign(stop, value);
+        for (const route of affected) {
+          route.stops = route.stops.map(n => n === oldName ? value.name : n);
+          const first = state.stops.find(s => s.name === route.stops[0]);
+          state.buses.filter(b => b.routeId === route.id).forEach(b => Object.assign(b, { engineOn: false, preview: false, startedAt: null, progressSeconds: 0, locationProgressSeconds: 0, lat: first.lat, lng: first.lng, nextStop: route.stops[1], updatedAt: new Date(now()).toISOString() }));
+        }
+      });
+    },
+    deleteStop(stopId) {
+      admin(); return mutate(state => {
+        const stop = state.stops.find(s => s.id === stopId); if (!stop) throw new Error('Stop not found.');
+        if (state.routes.some(route => route.stops.includes(stop.name))) throw new Error('A route still uses this stop. Remove it from the route first.');
+        state.stops = state.stops.filter(s => s.id !== stopId);
+      });
     },
     saveRoute(routeId, name, stopNames) {
       admin(); return mutate(state => {

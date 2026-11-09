@@ -52,8 +52,20 @@ test('demo authentication is explicit and sign-out removes permissions', () => {
 });
 test('invalid geometry is rejected before changing a route or creating a bus', () => {
   const store = makeStore(); store.signIn('admin');
-  store.saveStop('Point One', 18, -76); store.saveStop('Point Two', 18, -76);
+  store.saveStop('Point One', 18, -76.8); store.saveStop('Point Two', 18, -76.8);
   const original = store.loadRoutes()[0];
   assert.throws(() => store.saveRoute(original.id, original.name, ['Point One', 'Point Two']), /coordinates|geometry|length/i);
   assert.deepEqual(store.loadRoutes()[0], original);
+});
+test('stop editing updates route names without allowing deletion of an in-use stop', () => {
+  const store = makeStore(); store.signIn('admin');
+  const stop = store.loadStops().find(s => s.name === 'Papine');
+  store.updateStop(stop.id, 'Papine Terminal', stop.lat, stop.lng);
+  assert.ok(store.loadRoutes().some(r => r.stops.includes('Papine Terminal')));
+  assert.ok(!store.loadRoutes().some(r => r.stops.includes('Papine')));
+  assert.throws(() => store.deleteStop(stop.id), /route still uses/i);
+  store.saveStop('Unused stop', 18.05, -76.8);
+  const unused = store.loadStops().find(s => s.name === 'Unused stop');
+  store.deleteStop(unused.id);
+  assert.ok(!store.loadStops().some(s => s.id === unused.id));
 });

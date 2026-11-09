@@ -37,6 +37,21 @@ test('passenger, admin and driver pages complete the local demonstration workflo
     const { initDriver } = await server.ssrLoadModule('/JS/driver.js');
     await initDriver();
     assert.equal(document.getElementById('driver-console').hidden, false);
+    const { initRouteSharing } = await server.ssrLoadModule('/JS/route-sharing.js');
+    let finishPublish, sharingVisible = false, sharingStopped = false;
+    const routeForSharing = (await data.loadRoutes())[0];
+    await initRouteSharing(routeForSharing, {
+      loadStops: data.loadStops,
+      fetchRoadLegs: async () => null,
+      shareBusLocation: async () => { await new Promise(resolve => { finishPublish = resolve; }); sharingVisible = true; },
+      stopSharingLocation: async () => { sharingVisible = false; sharingStopped = true; }
+    });
+    document.getElementById('simulate-drive').click(); await settle();
+    document.getElementById('stop-sharing').click(); await settle();
+    finishPublish(); await settle();
+    assert.equal(sharingStopped, true);
+    assert.equal(sharingVisible, false, 'stopping must delete after the last in-flight publish');
+    assert.doesNotMatch(document.getElementById('driver-message').textContent, /Cannot read|could not/i);
     document.getElementById('engine-stop').click(); await settle();
     assert.equal((await data.loadAssignedBuses())[0].engineOn, false);
     document.getElementById('engine-start').click(); await settle();
@@ -47,7 +62,17 @@ test('passenger, admin and driver pages complete the local demonstration workflo
     loadDOM(await readFile(new URL('../admin.html', import.meta.url), 'utf8'));
     const { initAdmin } = await server.ssrLoadModule('/JS/admin.js'); await initAdmin();
     assert.equal(document.getElementById('admin-content').hidden, false);
-    assert.ok(document.getElementById('new-stop-name'));
+    assert.ok(document.getElementById('stop-form'), 'the incoming stop editor is present alongside fleet management');
+    document.getElementById('stop-name').value = 'Merge Test Stop';
+    document.getElementById('stop-lat').value = '18.025';
+    document.getElementById('stop-lng').value = '-76.81';
+    document.getElementById('stop-form').dispatchEvent(new window.Event('submit', { cancelable: true })); await settle();
+    assert.ok((await data.loadStops()).some(s => s.name === 'Merge Test Stop'));
+    const addedStopCard = [...document.querySelectorAll('#admin-stops article')].find(card => card.textContent.includes('Merge Test Stop'));
+    addedStopCard.querySelector('button[title="Edit stop"]').click();
+    document.getElementById('stop-name').value = 'Renamed Merge Stop';
+    document.getElementById('stop-form').dispatchEvent(new window.Event('submit', { cancelable: true })); await settle();
+    assert.ok((await data.loadStops()).some(s => s.name === 'Renamed Merge Stop'));
     document.getElementById('route-name').value = 'UI newly created route';
     document.getElementById('route-stops').value = 'Cross Roads, Papine';
     document.getElementById('route-form').dispatchEvent(new window.Event('submit', { cancelable: true })); await settle();

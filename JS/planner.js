@@ -1,5 +1,15 @@
 const MAX_DELAY_MINUTES = 120;
 
+// Stops and shared bus locations must be in Jamaica. share_bus_location()
+// and the bus_locations checks in supabase/schema.sql use the same numbers.
+export const JAMAICA_BOUNDS = { minLat: 17.6, maxLat: 18.6, minLng: -78.4, maxLng: -76.1 };
+
+export function isInJamaica(lat, lng) {
+  return Number.isFinite(lat) && Number.isFinite(lng) &&
+    lat >= JAMAICA_BOUNDS.minLat && lat <= JAMAICA_BOUNDS.maxLat &&
+    lng >= JAMAICA_BOUNDS.minLng && lng <= JAMAICA_BOUNDS.maxLng;
+}
+
 export function findJourneys(routes, stops, startName, endName) {
   const normalStart = startName.trim().toLocaleLowerCase();
   const normalEnd = endName.trim().toLocaleLowerCase();
@@ -70,4 +80,35 @@ export function validateAlert(enteredMessage, enteredDelay) {
   }
 
   return { message, delayMinutes };
+}
+
+// Returns { error, field } when the form is invalid, otherwise { name, lat, lng }.
+export function validateStop(enteredName, enteredLat, enteredLng, stops, editingId) {
+  const name = enteredName.trim().replace(/\s+/g, " ");
+  if (name.length < 2 || name.length > 60) {
+    return { error: "Enter a stop name from 2 to 60 characters.", field: "name" };
+  }
+  const duplicateName = stops.some(stop =>
+    stop.id !== editingId && stop.name.toLocaleLowerCase() === name.toLocaleLowerCase()
+  );
+  if (duplicateName) {
+    return { error: "A stop already uses that name.", field: "name" };
+  }
+
+  const lat = String(enteredLat).trim() === "" ? NaN : Number(enteredLat);
+  const lng = String(enteredLng).trim() === "" ? NaN : Number(enteredLng);
+  if (!Number.isFinite(lat) || lat < JAMAICA_BOUNDS.minLat || lat > JAMAICA_BOUNDS.maxLat) {
+    return {
+      error: "Enter a latitude in Jamaica, from " + JAMAICA_BOUNDS.minLat + " to " + JAMAICA_BOUNDS.maxLat + ".",
+      field: "lat"
+    };
+  }
+  if (!Number.isFinite(lng) || lng < JAMAICA_BOUNDS.minLng || lng > JAMAICA_BOUNDS.maxLng) {
+    return {
+      error: "Enter a longitude in Jamaica, from " + JAMAICA_BOUNDS.minLng + " to " + JAMAICA_BOUNDS.maxLng + ".",
+      field: "lng"
+    };
+  }
+
+  return { name, lat, lng };
 }

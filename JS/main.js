@@ -17,7 +17,7 @@ const notice = document.createElement('p');
 notice.className = 'prototype-notice';
 notice.textContent = isDemoMode()
   ? 'Local demonstration · Sample data is saved only in this browser. Demo roles are not real accounts.'
-  : 'Academic demonstration · Bus positions and arrival estimates are simulated, not official JUTC service information.';
+  : 'Academic demonstration · Buses show saved simulation data or a driver-shared location, as labelled. Estimates are not official JUTC service information.';
 document.querySelector('.site-header')?.after(notice);
 
 async function initializePage() {

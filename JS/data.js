@@ -59,9 +59,19 @@ export async function getSession() {
   if (isDemoMode()) return local().getSession();
   const session = checked(await getSupabase().auth.getSession()).session;
   if (!session) return null;
-  const role = checked(await getSupabase().from('user_roles').select('role').eq('user_id', session.user.id).maybeSingle());
-  return { ...session, role: role?.role || 'unassigned' };
+  const role = await optionalRow(getSupabase().from('user_roles').select('role').eq('user_id', session.user.id).maybeSingle());
+  if (role?.role === 'admin') return { ...session, role: 'admin' };
+  const admin = await optionalRow(getSupabase().from('admins').select('user_id').eq('user_id', session.user.id).maybeSingle());
+  if (admin) return { ...session, role: 'admin' };
+  const driver = role?.role === 'driver' ? true : await optionalRow(getSupabase().from('drivers').select('user_id').eq('user_id', session.user.id).maybeSingle());
+  return { ...session, role: driver ? 'driver' : 'unassigned' };
 }
+async function optionalRow(query) {
+  const result = await query;
+  if (['PGRST205', '42P01'].includes(result.error?.code)) return null;
+  return checked(result);
+}
+export async function isAdmin() { return (await getSession())?.role === 'admin'; }
 export async function logIn(email, password) {
   if (isDemoMode()) throw new Error('Use the labelled demo access buttons.');
   checked(await getSupabase().auth.signInWithPassword({ email: loginEmail(email), password }));
@@ -85,9 +95,47 @@ export async function loadAssignedBuses() {
   const assignments = checked(await getSupabase().from('bus_assignments').select('bus_id').eq('driver_id', session.user.id));
   const buses = await loadBuses(); return buses.filter(b => assignments.some(a => a.bus_id === b.id));
 }
-export async function saveStop(name, lat, lng) {
-  if (isDemoMode()) return local().saveStop(name, lat, lng);
-  checked(await getSupabase().from('stops').insert({ name, lat, lng }));
+export async function saveStop(...args) {
+  const [stopId, name, lat, lng] = args.length === 3 ? [null, ...args] : args;
+  if (isDemoMode()) return stopId ? local().updateStop(stopId, name, lat, lng) : local().saveStop(name, lat, lng);
+  if (stopId) {
+    const result = await getSupabase().rpc('jutc_save_stop', { p_stop_id: stopId, p_name: name, p_lat: lat, p_lng: lng });
+    if (result.error?.code === 'PGRST202') throw new Error('Stop editing requires the database update in supabase/update-stop-management.sql. Ask the project administrator to apply it.');
+    return checked(result);
+  }
+  const query = getSupabase().from('stops').insert({ name, lat, lng }).select('id');
+  const result = await query;
+  if (result.error?.code === '23505') throw new Error('A stop already uses that name.');
+  changed(result);
+}
+export async function deleteStop(stopId) {
+  if (isDemoMode()) return local().deleteStop(stopId);
+  const result = await getSupabase().from('stops').delete().eq('id', stopId).select('id');
+  if (result.error?.code === '23503') throw new Error('A route still uses this stop. Remove it from the route first.');
+  changed(result);
+}
+
+// Route-based sharing from the incoming driver module coexists with the individual fleet.
+export async function loadLiveBusLocations() {
+  if (isDemoMode()) return new Map();
+  const rows = await optionalRow(getSupabase().from('live_bus_locations').select('route_id,lat,lng,direction,updated_at'));
+  return new Map((rows || []).map(row => [row.route_id, { latLng: [row.lat, row.lng], direction: row.direction, updatedAt: row.updated_at }]));
+}
+export async function loadMyRoute() {
+  if (isDemoMode()) return null;
+  const session = await getSession(); if (!session) return null;
+  const row = await optionalRow(getSupabase().from('drivers').select('routes(id,name,route_stops(position,stops(name)))').eq('user_id', session.user.id).maybeSingle());
+  if (!row?.routes) return null;
+  const route = row.routes;
+  const stops = [...route.route_stops].sort((a, b) => a.position - b.position).map(s => s.stops.name);
+  return stops.length < 2 ? null : { id: route.id, name: route.name, stops };
+}
+export async function shareBusLocation(lat, lng, direction) {
+  if (isDemoMode()) throw new Error('Route-based GPS sharing requires the shared database.');
+  checked(await getSupabase().rpc('share_bus_location', { p_lat: lat, p_lng: lng, p_direction: direction }));
+}
+export async function stopSharingLocation() {
+  if (!isDemoMode()) checked(await getSupabase().rpc('stop_sharing_location'));
 }
 export async function saveBus(label, routeId, driverId) {
   if (isDemoMode()) return local().saveBus(label, routeId, driverId);

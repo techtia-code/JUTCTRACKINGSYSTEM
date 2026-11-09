@@ -34,6 +34,20 @@
       <button id="driver-save-status" class="btn btn-secondary">Update status</button>
       <p class="fine-print">Engine off freezes the saved position. If updates stop for more than one minute, passengers see a stale-location warning and no arrival estimate.</p>
     </section>
+    <section id="driver-content" class="admin-card" aria-labelledby="driver-route" hidden>
+      <p class="eyebrow eyebrow-dark">ROUTE LOCATION SHARING</p>
+      <h2 id="driver-route"></h2>
+      <p id="driver-route-stops" class="muted-copy"></p>
+      <p id="route-sharing-status" class="driver-status" aria-live="polite">Not sharing</p>
+      <p id="driver-last-sent" class="muted-copy" aria-live="polite"></p>
+      <div class="driver-actions">
+        <button id="share-gps" class="btn btn-primary" type="button">Share my location</button>
+        <button id="simulate-drive" class="btn btn-secondary" type="button">Simulate a drive</button>
+        <button id="stop-sharing" class="btn btn-secondary" type="button" hidden>Stop sharing</button>
+      </div>
+      <p id="driver-message" class="admin-message" aria-live="polite"></p>
+      <p class="fine-print">Available to accounts with a route assignment. GPS sharing requires your browser's location permission and HTTPS or localhost. Keep this page open while sharing. Route-shared positions appear as a separate labelled bus and expire after one minute without an update.</p>
+    </section>
   </main>
   <div id="app-error" class="app-error" role="alert" hidden></div>
   <script type="module" src="./JS/main.js"></script>

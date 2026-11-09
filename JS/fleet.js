@@ -1,7 +1,20 @@
-import { findBusPosition, getEtaMinutes, makeRoutePath } from './simulation.js';
+import { AVERAGE_SPEED_METRES_PER_SECOND, findBusPosition, findPositionFromTravelled, getEtaMinutes, getTravelledFromLocation, makeRoutePath } from './simulation.js';
 
 export const BUS_UPDATE_INTERVAL_MS = 5000;
 export const STALE_AFTER_MS = 60000;
+
+// Route-based driver feeds have no fleet ID. Keep them separate rather than overwrite every bus on that route.
+export function routeSharedBuses(routes, coordinates, locations) {
+  return routes.flatMap(route => {
+    const location = locations.get(route.id); if (!location) return [];
+    const path = makeRoutePath(route, coordinates);
+    const travelled = getTravelledFromLocation(path, location.latLng, location.direction);
+    return [{ id: `route-shared:${route.id}`, label: `Driver-shared bus · ${route.name}`, routeId: route.id,
+      engineOn: true, status: 'on_time', lat: location.latLng[0], lng: location.latLng[1],
+      updatedAt: location.updatedAt, locationProgressSeconds: travelled / AVERAGE_SPEED_METRES_PER_SECOND,
+      nextStop: findPositionFromTravelled(route, path, travelled).nextStop, source: 'driver' }];
+  });
+}
 
 export function elapsedSeconds(bus, now = Date.now()) {
   const elapsed = bus.engineOn && bus.startedAt ? Math.max(0, (now - Date.parse(bus.startedAt)) / 1000) : 0;

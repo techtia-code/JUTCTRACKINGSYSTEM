@@ -63,7 +63,7 @@ insert into stops (name, lat, lng) values
   ('University of Technology', 18.0165, -76.7435),
   ('Papine', 18.0168, -76.7422),
   ('Spanish Town', 17.9957, -76.9541),
-  ('Angels', 18.0357, -76.9678),
+  ('Angels', 18.0406, -76.9795),
   ('Ferry', 18.0235, -76.8770);
 
 insert into routes (name) values
@@ -101,9 +101,18 @@ create table if not exists public.user_roles (
   role text not null check (role in ('admin', 'driver'))
 );
 
+-- Compatibility with route-based staff accounts from the incoming branch.
+create table if not exists public.admins (
+  user_id uuid primary key references auth.users(id) on delete cascade
+);
+alter table public.admins enable row level security;
+create policy "Users can see if they are an administrator" on public.admins for select to authenticated using (user_id = auth.uid());
+grant select on public.admins to authenticated;
+revoke insert, update, delete on public.admins from anon, authenticated;
+
 create or replace function public.is_admin() returns boolean
 language sql stable security definer set search_path = public, pg_temp
-as $$ select exists(select 1 from public.user_roles where user_id = auth.uid() and role = 'admin'); $$;
+as $$ select exists(select 1 from public.user_roles where user_id = auth.uid() and role = 'admin') or exists(select 1 from public.admins where user_id = auth.uid()); $$;
 
 create table if not exists public.buses (
   id uuid primary key default gen_random_uuid(),
@@ -342,4 +351,127 @@ create trigger jutc_bus_route_geometry before insert or update of route_id on pu
   for each row execute function public.jutc_validate_bus_route();
 
 notify pgrst, 'reload schema';
+
+-- Optional route-assigned driver GPS and demonstration sharing.
+create table if not exists drivers (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  route_id uuid not null references routes (id) on delete cascade
+);
+
+-- The last position a driver shared for their route: one bus per route.
+-- The limits are Jamaica (JAMAICA_BOUNDS in JS/planner.js).
+create table if not exists bus_locations (
+  route_id uuid primary key references routes (id) on delete cascade,
+  lat double precision not null check (lat between 17.6 and 18.6),
+  lng double precision not null check (lng between -78.4 and -76.1),
+  direction text not null check (direction in ('outbound', 'inbound')),
+  updated_at timestamptz not null default now()
+);
+
+alter table drivers enable row level security;
+alter table bus_locations enable row level security;
+
+-- Lets the driver page find the logged-in driver's route.
+drop policy if exists "Drivers can see their own route" on drivers;
+create policy "Drivers can see their own route" on drivers for select to authenticated
+  using (user_id = (select auth.uid()));
+drop policy if exists "Administrators can see drivers" on drivers;
+create policy "Administrators can see drivers" on drivers for select to authenticated
+  using (is_admin());
+-- Anyone can read bus locations. Nobody writes them directly: only through
+-- share_bus_location() and stop_sharing_location() below.
+drop policy if exists "Anyone can read bus locations" on bus_locations;
+create policy "Anyone can read bus locations" on bus_locations for select using (true);
+
+-- Positions shared in the last minute. The database's clock decides what
+-- is live, so a wrong clock on a visitor's phone does not matter.
+create or replace view live_bus_locations with (security_invoker = true) as
+  select route_id, lat, lng, direction, updated_at
+  from public.bus_locations
+  where updated_at > now() - interval '60 seconds';
+
+-- Saves the logged-in driver's position for their own route, stamped with
+-- the database's time. It runs as the table owner so drivers need no write
+-- access to bus_locations, which means they cannot move another route's
+-- bus or change the time.
+create or replace function share_bus_location(p_lat double precision, p_lng double precision, p_direction text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  driver_route uuid;
+begin
+  select route_id into driver_route from public.drivers where user_id = (select auth.uid());
+  if driver_route is null then
+    raise exception 'This account is not a bus driver.';
+  end if;
+  if p_lat is null or p_lng is null
+     or p_lat not between 17.6 and 18.6 or p_lng not between -78.4 and -76.1 then
+    raise exception 'That location is outside Jamaica.';
+  end if;
+  if p_direction is null or p_direction not in ('outbound', 'inbound') then
+    raise exception 'The direction must be outbound or inbound.';
+  end if;
+
+  insert into public.bus_locations (route_id, lat, lng, direction, updated_at)
+  values (driver_route, p_lat, p_lng, p_direction, now())
+  on conflict (route_id) do update
+    set lat = excluded.lat, lng = excluded.lng, direction = excluded.direction, updated_at = excluded.updated_at;
+end;
+$$;
+
+-- Takes the logged-in driver's bus off the map straight away.
+create or replace function stop_sharing_location()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  delete from public.bus_locations
+  where route_id = (select route_id from public.drivers where user_id = (select auth.uid()));
+end;
+$$;
+
+grant select on bus_locations, live_bus_locations to anon, authenticated;
+grant select on drivers to authenticated;
+revoke insert, update, delete on bus_locations, drivers from anon, authenticated;
+revoke execute on function share_bus_location(double precision, double precision, text) from public, anon;
+revoke execute on function stop_sharing_location() from public, anon;
+grant execute on function share_bus_location(double precision, double precision, text) to authenticated;
+grant execute on function stop_sharing_location() to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- Atomic stop editing shared by the management page.
+create or replace function public.jutc_save_stop(p_stop_id bigint, p_name text, p_lat double precision, p_lng double precision)
+returns bigint language plpgsql security definer set search_path = public, pg_temp as $$
+declare saved_id bigint; affected record; names text[];
+begin
+  if not public.is_admin() then raise exception 'Administrator access required'; end if;
+  if p_name is null or length(trim(p_name)) not between 2 and 60 then raise exception 'Enter a stop name from 2 to 60 characters'; end if;
+  if p_lat is null or p_lng is null or p_lat not between 17.6 and 18.6 or p_lng not between -78.4 and -76.1 then raise exception 'Enter coordinates in Jamaica'; end if;
+  if exists(select 1 from public.stops where lower(name) = lower(trim(p_name)) and id is distinct from p_stop_id) then raise exception 'A stop already uses that name'; end if;
+  if p_stop_id is null then
+    insert into public.stops(name,lat,lng) values(trim(p_name),p_lat,p_lng) returning id into saved_id;
+  else
+    update public.stops set name = trim(p_name), lat = p_lat, lng = p_lng where id = p_stop_id returning id into saved_id;
+    if saved_id is null then raise exception 'Stop not found'; end if;
+    for affected in select distinct r.id,r.name from public.routes r join public.route_stops rs on rs.route_id = r.id where rs.stop_id = saved_id order by r.id loop
+      select array_agg(s.name order by rs.position) into names from public.route_stops rs join public.stops s on s.id = rs.stop_id where rs.route_id = affected.id;
+      perform public.jutc_check_route_geometry(names);
+      perform public.jutc_save_route(affected.id,affected.name,names);
+      if to_regclass('public.bus_locations') is not null then
+        execute 'delete from public.bus_locations where route_id = $1' using affected.id;
+      end if;
+    end loop;
+  end if;
+  return saved_id;
+end $$;
+revoke all on function public.jutc_save_stop(bigint,text,double precision,double precision) from public,anon;
+grant execute on function public.jutc_save_stop(bigint,text,double precision,double precision) to authenticated;
+notify pgrst, 'reload schema';
+
 commit;

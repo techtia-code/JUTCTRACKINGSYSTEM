@@ -110,6 +110,48 @@
           <div id="admin-routes" class="admin-routes" aria-live="polite"></div>
         </section>
 
+        <section class="admin-card" aria-labelledby="stop-form-heading">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow eyebrow-dark">STOP DETAILS</p>
+              <h2 id="stop-form-heading" class="heading-with-icon">Add a stop</h2>
+            </div>
+          </div>
+          <form id="stop-form" class="route-form" novalidate>
+            <div class="field">
+              <label for="stop-name">Stop name</label>
+              <input id="stop-name" name="stopName" type="text" maxlength="60" placeholder="For example, Barbican Square" required />
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="stop-lat">Latitude</label>
+                <input id="stop-lat" name="stopLat" type="number" step="any" min="17.6" max="18.6" placeholder="18.0119" required />
+              </div>
+              <div class="field">
+                <label for="stop-lng">Longitude</label>
+                <input id="stop-lng" name="stopLng" type="number" step="any" min="-78.4" max="-76.1" placeholder="-76.7969" required />
+              </div>
+            </div>
+            <p class="field-help">To find a stop's coordinates, right-click the place in Google Maps or OpenStreetMap and copy the two numbers.</p>
+            <div class="form-actions">
+              <button id="save-stop" type="submit" class="btn btn-primary">Add stop</button>
+              <button id="cancel-stop-edit" type="button" class="btn btn-secondary" hidden>Cancel</button>
+            </div>
+          </form>
+          <p id="stop-message" class="admin-message" aria-live="polite"></p>
+        </section>
+
+        <section class="admin-card" aria-labelledby="saved-stops-heading">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow eyebrow-dark">CURRENT STOPS</p>
+              <h2 id="saved-stops-heading">Stop list</h2>
+            </div>
+            <span id="stop-count" class="route-count"></span>
+          </div>
+          <div id="admin-stops" class="admin-routes" aria-live="polite"></div>
+        </section>
+
         <section class="admin-card" aria-labelledby="alert-form-heading">
           <div class="section-head">
             <div>
@@ -176,6 +218,11 @@
             <h2>Plan a journey</h2>
             <a href="index.html#tracker">Map preview</a>
             <a href="index.html#eta">Arrival estimates</a>
+          </div>
+          <div class="footer-group">
+            <h2>Staff</h2>
+            <a href="driver.html">Bus drivers</a>
+            <a href="admin.html">Route management</a>
           </div>
         </div>
         <div class="footer-bottom">

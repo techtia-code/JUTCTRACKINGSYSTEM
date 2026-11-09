@@ -45,3 +45,14 @@ test('stop validation rejects invalid coordinates and duplicate names', () => {
   assert.ok(fleet.validateStop(' papine ', '18', '-76', [{ name: 'Papine' }]).error);
   assert.deepEqual(fleet.validateStop(' New stop ', '18', '-76', []), { name: 'New stop', lat: 18, lng: -76 });
 });
+test('route-shared positions stay separate from individual fleet buses and retain their coordinates', () => {
+  const locations = new Map([['r1', { latLng: [18.005, -76.8], direction: 'outbound', updatedAt: new Date(now).toISOString() }]]);
+  const shared = fleet.routeSharedBuses([route], coordinates, locations);
+  assert.equal(shared.length, 1);
+  assert.equal(shared[0].id, 'route-shared:r1');
+  assert.equal(shared[0].source, 'driver');
+  assert.equal(shared[0].lat, 18.005);
+  assert.equal(shared[0].lng, -76.8);
+  assert.ok(fleet.busEtaMinutes(shared[0], route, coordinates, 'C', 0, now) >= 0);
+  assert.deepEqual(fleet.routeSharedBuses([route], coordinates, new Map()), []);
+});

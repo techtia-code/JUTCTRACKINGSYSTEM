@@ -1,8 +1,8 @@
-import { ALERT_TYPES, loadAlerts, loadBuses, loadRoutes, loadStops } from "./data.js";
+import { ALERT_TYPES, loadAlerts, loadBuses, loadLiveBusLocations, loadRoutes, loadStops } from "./data.js";
 import { makeElement } from "./dom.js";
 import { findJourneys, routeMatchesSearch } from "./planner.js";
 import { getDelayMinutes, getDistanceMetres } from "./simulation.js";
-import { busEtaMinutes, getBusAlerts, isFresh } from './fleet.js';
+import { busEtaMinutes, getBusAlerts, isFresh, routeSharedBuses } from './fleet.js';
 
 const ETA_UPDATE_INTERVAL_MS = 5000;
 const ALERT_UPDATE_INTERVAL_MS = 30000;
@@ -224,7 +224,9 @@ export async function initHome({ loadMap = () => import('./map.js') } = {}) {
   async function refreshFleet() {
     if (refreshing) return; refreshing = true;
     try {
-      const [nextBuses, nextStops, nextRoutes] = await Promise.all([loadBuses(), loadStops(), loadRoutes()]);
+      const [fleetBuses, nextStops, nextRoutes, liveLocations] = await Promise.all([loadBuses(), loadStops(), loadRoutes(), loadLiveBusLocations()]);
+      const nextCoordinates = Object.fromEntries(nextStops.map(stop => [stop.name, [stop.lat, stop.lng]]));
+      const nextBuses = [...fleetBuses, ...routeSharedBuses(nextRoutes, nextCoordinates, liveLocations)];
       if (watching && (!nextBuses.some(bus => bus.id === watchedSelection?.busId && bus.routeId === watchedSelection?.routeId) ||
         !nextRoutes.some(route => route.id === watchedSelection?.routeId && route.stops.includes(watchedSelection?.stop)))) {
         clearWatch('The watched bus, route or stop is no longer available. Select another bus to watch.');
