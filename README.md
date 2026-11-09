@@ -63,16 +63,14 @@ You need [Node.js](https://nodejs.org) 22.12 or newer and a free Supabase accoun
 
 4. **Create a driver login**
 
-   1. In **Authentication**, add a user for the driver.
-   2. In the **SQL Editor**, give them the route they drive:
+   1. In **Authentication**, add a user for the driver, with **Auto Confirm User** ticked so they can log in straight away.
+   2. In the **SQL Editor**, give them the route they drive, using the route's name from the admin page:
 
       ```sql
-      insert into drivers (user_id, route_id)
-      select users.id, routes.id
-      from auth.users users, routes
-      where users.email = 'driver@example.com'
-        and routes.name = 'Half-Way Tree to Papine';
+      select add_driver('driver@example.com', 'Half-Way Tree to Papine');
       ```
+
+      It replies with a confirmation, or explains what's wrong if the email or route name doesn't match. Running it again with another route moves the driver to that route. To remove a driver, delete their user in **Authentication**.
 
 5. **Connect the website to Supabase**
 

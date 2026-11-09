@@ -7,12 +7,9 @@
 --      with their email address:
 --        insert into admins (user_id)
 --        select id from auth.users where email = 'admin@example.com';
---   4. For each bus driver, add a user, then give them a route:
---        insert into drivers (user_id, route_id)
---        select users.id, routes.id
---        from auth.users users, routes
---        where users.email = 'driver@example.com'
---          and routes.name = 'Half-Way Tree to Papine';
+--   4. For each bus driver, add a user with "Auto Confirm User" ticked,
+--      then give them a route in the SQL editor:
+--        select add_driver('driver@example.com', 'Half-Way Tree to Papine');
 
 create table stops (
   id bigint generated always as identity primary key,
@@ -253,3 +250,37 @@ revoke execute on function share_bus_location(double precision, double precision
 revoke execute on function stop_sharing_location() from public, anon;
 grant execute on function share_bus_location(double precision, double precision, text) to authenticated;
 grant execute on function stop_sharing_location() to authenticated;
+
+-- Makes a login a bus driver for a route, or moves a driver to another
+-- route. Add the login first under Authentication > Add user, then run:
+--   select add_driver('driver@example.com', 'Half-Way Tree to Papine');
+-- Only the SQL editor can run it; the website cannot.
+create or replace function add_driver(driver_email text, route_name text)
+returns text
+language plpgsql
+set search_path = ''
+as $$
+declare
+  driver_id uuid;
+  found_route_id uuid;
+  found_route_name text;
+begin
+  select id into driver_id from auth.users where lower(email) = lower(trim(driver_email));
+  if driver_id is null then
+    raise exception 'No login uses the email %. Add it first under Authentication > Add user.', driver_email;
+  end if;
+
+  select id, name into found_route_id, found_route_name
+  from public.routes where lower(name) = lower(trim(route_name));
+  if found_route_id is null then
+    raise exception 'There is no route called "%". Copy the name from the route list on the admin page.', route_name;
+  end if;
+
+  insert into public.drivers (user_id, route_id) values (driver_id, found_route_id)
+  on conflict (user_id) do update set route_id = excluded.route_id;
+
+  return trim(driver_email) || ' now drives ' || found_route_name || ' and can log in at driver.html.';
+end;
+$$;
+
+revoke execute on function add_driver(text, text) from public, anon, authenticated;
