@@ -5,7 +5,9 @@
 -- insert into public.user_roles(user_id, role)
 -- select id, 'admin' from auth.users where email = 'jutcadmin2026@example.invalid'
 -- on conflict(user_id) do update set role = excluded.role;
--- Use 'driver' for driver accounts. Supabase organization membership is separate from app roles.
+-- Use 'driver' for individual fleet accounts. Supabase organization membership is separate from app roles.
+-- For optional route-based driver sharing, create a confirmed Auth user, then run in SQL Editor:
+-- select add_driver('driver@example.com', 'Half-Way Tree to Papine');
 
 begin;
 
@@ -474,4 +476,39 @@ revoke all on function public.jutc_save_stop(bigint,text,double precision,double
 grant execute on function public.jutc_save_stop(bigint,text,double precision,double precision) to authenticated;
 notify pgrst, 'reload schema';
 
+-- Makes a login a bus driver for a route, or moves a driver to another
+-- route. Add the login first under Authentication > Add user, then run:
+--   select add_driver('driver@example.com', 'Half-Way Tree to Papine');
+-- Only the SQL editor can run it; the website cannot.
+create or replace function add_driver(driver_email text, route_name text)
+returns text
+language plpgsql
+set search_path = ''
+as $$
+declare
+  driver_id uuid;
+  found_route_id uuid;
+  found_route_name text;
+begin
+  select id into driver_id from auth.users where lower(email) = lower(trim(driver_email));
+  if driver_id is null then
+    raise exception 'No login uses the email %. Add it first under Authentication > Add user.', driver_email;
+  end if;
+
+  select id, name into found_route_id, found_route_name
+  from public.routes where lower(name) = lower(trim(route_name));
+  if found_route_id is null then
+    raise exception 'There is no route called "%". Copy the name from the route list on the admin page.', route_name;
+  end if;
+
+  insert into public.drivers (user_id, route_id) values (driver_id, found_route_id)
+  on conflict (user_id) do update set route_id = excluded.route_id;
+
+  return trim(driver_email) || ' now drives ' || found_route_name || ' and can log in at driver.html.';
+end;
+$$;
+
+revoke execute on function add_driver(text, text) from public, anon, authenticated;
+
+notify pgrst, 'reload schema';
 commit;

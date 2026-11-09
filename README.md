@@ -62,3 +62,13 @@ Distances are straight lines between stops, worked out from their coordinates wi
 The project preserves the existing per-bus fleet and `JUTCAdmin2026` login alongside the incoming route-based sharing feature. Route-shared positions are labelled separately so one driver feed never replaces every bus on a route. The existing shared database is already configured for the fleet; do not rerun the fresh-only `schema.sql` against populated tables. The optional route-sharing SQL is provided for a project operator to apply if those tables are missing.
 
 Stop editing on an existing fleet database requires `supabase/update-stop-management.sql`. It validates geometry and parks affected fleet buses in the same transaction; new installations already include it in `schema.sql`.
+
+## Assign a driver to a route
+
+Create the driver's application login under Supabase Authentication with **Auto Confirm User** enabled, then run this in the Supabase SQL Editor:
+
+```sql
+select add_driver('driver@example.com', 'Half-Way Tree to Papine');
+```
+
+The helper checks the email and route name and confirms the assignment. Run it again with a different route to reassign the driver. It is available only to database operators, not browser clients. Existing databases obtain it by running `supabase/add-driver-tracking.sql`; fresh installations include it in `schema.sql`. Individual fleet-bus assignments remain available through the administration page.
