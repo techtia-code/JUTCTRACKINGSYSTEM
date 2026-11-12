@@ -2,63 +2,40 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b6e4f" />
   <meta name="description" content="Plan a sample JUTC journey, view bus routes, and check simulated arrival times." />
   <title>JUTC Bus Tracker | Plan your journey</title>
   <link rel="stylesheet" href="./STYLES/style.css" />
 </head>
 <body data-page="home">
-  <div id="loading-root"></div>
   <header class="site-header">
     <div class="container header-inner">
       <a href="index.html" class="logo">JUTC <span>Bus Tracker</span></a>
-      <nav class="nav" aria-label="Main navigation">
-        <a href="driver.html">Driver console</a>
-        <a href="#routes" class="nav-icon-link">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6 9 3l6 3 6-3v15l-6 3-6-3-6 3V6Z"></path><path d="M9 3v15m6-12v15"></path></svg>
-          Routes
-        </a>
-        <a href="#tracker" class="nav-icon-link">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-11a8 8 0 1 0-16 0c0 7 8 11 8 11Z"></path><circle cx="12" cy="11" r="2.5"></circle></svg>
-          Map preview
-        </a>
-        <a href="#eta" class="nav-icon-link">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
-          Arrivals
-        </a>
-        <a href="#alerts" class="nav-icon-link">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg>
-          Service information
-        </a>
-        <a href="admin.html" class="btn route-management-link">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6 9 3l6 3 6-3v15l-6 3-6-3-6 3V6Z"></path><path d="M9 3v15m6-12v15"></path></svg>
-          Route management
-        </a>
+      <nav class="nav tab-bar" aria-label="Sections">
+        <a href="#plan"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>Plan</a>
+        <a href="#routes"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6 9 3l6 3 6-3v15l-6 3-6-3-6 3V6Z"></path><path d="M9 3v15m6-12v15"></path></svg>Routes</a>
+        <a href="#tracker"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-11a8 8 0 1 0-16 0c0 7 8 11 8 11Z"></path><circle cx="12" cy="11" r="2.5"></circle></svg>Map</a>
+        <a href="#eta"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Arrivals</a>
+        <a href="#alerts"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg>Alerts</a>
       </nav>
     </div>
   </header>
 
   <main>
-    <section class="hero">
-      <div class="container hero-content">
-        <div class="hero-copy">
-          <p class="eyebrow">KINGSTON METROPOLITAN AREA</p>
-          <h1>Plan your next bus journey.</h1>
-        </div>
+    <section id="plan" class="hero">
+      <div class="container">
+        <h1>Plan your next bus journey.</h1>
         <form id="route-search-form" class="search-card" autocomplete="off">
           <div class="field">
-            <label for="start-stop">Starting stop</label>
-            <input list="stop-list" id="start-stop" placeholder="Choose a stop" required />
+            <label for="start-stop">From</label>
+            <select id="start-stop" required></select>
           </div>
           <div class="field">
-            <label for="end-stop">Destination</label>
-            <input list="stop-list" id="end-stop" placeholder="Choose a stop" required />
+            <label for="end-stop">To</label>
+            <select id="end-stop" required></select>
           </div>
-          <datalist id="stop-list"></datalist>
-          <button type="submit" class="btn btn-primary">
-            Find a route
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
-          </button>
+          <button type="submit" class="btn btn-primary">Find a route</button>
         </form>
         <div id="search-results" class="search-results" aria-live="polite"></div>
       </div>
@@ -67,16 +44,10 @@
     <section id="routes" class="section">
       <div class="container">
         <div class="section-head">
-          <div>
-            <p class="eyebrow eyebrow-dark">PLAN A JOURNEY</p>
-            <h2 class="heading-with-icon">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6 9 3l6 3 6-3v15l-6 3-6-3-6 3V6Z"></path><path d="M9 3v15m6-12v15"></path></svg>
-              Sample routes
-            </h2>
-          </div>
+          <h2>Routes</h2>
           <div class="field route-filter">
             <label for="route-filter">Search routes</label>
-            <input id="route-filter" type="search" placeholder="Route or stop name" autocomplete="off" />
+            <input id="route-filter" type="search" placeholder="Route number, name or stop" autocomplete="off" />
           </div>
         </div>
         <div id="routes-list" class="routes-grid" aria-live="polite"></div>
@@ -86,18 +57,11 @@
     <section id="tracker" class="section section-alt" tabindex="-1">
       <div class="container">
         <div class="section-head">
-          <div>
-            <p class="eyebrow eyebrow-dark">TRACKING PREVIEW</p>
-            <h2 class="heading-with-icon">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-11a8 8 0 1 0-16 0c0 7 8 11 8 11Z"></path><circle cx="12" cy="11" r="2.5"></circle></svg>
-              Map preview
-            </h2>
-          </div>
+          <h2>Bus map</h2>
+          <button id="show-all-routes" class="btn btn-secondary btn-small" type="button" hidden>Show all routes</button>
         </div>
-        <div class="map-tools">
-          <p id="map-selection" class="fine-print" role="status">Showing all routes and buses.</p>
-          <button id="show-all-routes" class="btn btn-secondary" type="button" hidden>Show all routes</button>
-        </div>
+        <p id="map-selection" class="muted-copy" role="status">Showing all routes and buses.</p>
+        <p class="fine-print touch-hint">Use two fingers to move the map.</p>
         <div class="map-layout">
           <div id="map" class="map" role="region" aria-label="Map of sample bus routes in Kingston"></div>
           <aside class="map-sidebar" aria-label="Sample bus information"></aside>
@@ -108,14 +72,8 @@
     <section id="eta" class="section">
       <div class="container">
         <div class="section-head">
-          <div>
-            <p class="eyebrow eyebrow-dark">AT YOUR STOP</p>
-            <h2 class="heading-with-icon">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
-              Estimated arrivals
-            </h2>
-          </div>
-          <p class="section-intro">Select a bus to see an estimate from its saved simulated position or labelled driver-shared location, average speed and reported delays.</p>
+          <h2>Estimated arrivals</h2>
+          <p class="muted-copy">Tap the bell on a bus for an alert when it's close.</p>
         </div>
         <div class="eta-panel">
           <div class="eta-controls">
@@ -124,68 +82,37 @@
               <select id="eta-route"></select>
             </div>
             <div class="field">
-              <label for="eta-bus">Bus</label>
-              <select id="eta-bus"></select>
-            </div>
-            <div class="field">
-              <label for="eta-stop">Bus stop</label>
+              <label for="eta-stop">Your stop</label>
               <select id="eta-stop"></select>
             </div>
           </div>
-          <div id="eta-results" class="eta-results" aria-live="polite"></div>
-          <p id="fleet-message" class="fine-print" role="status"></p>
-          <div class="driver-actions"><button id="watch-bus" class="btn btn-secondary" type="button">Watch this bus</button><button id="stop-watch" class="btn btn-secondary" type="button" hidden>Stop watching</button><button id="enable-notifications" class="btn btn-secondary" type="button">Enable device notifications</button></div>
-          <p id="notification-message" class="fine-print" role="status">Watch a bus for an alert when it is within 1 km of your selected stop or delayed. Device notifications are optional and require this page to stay open.</p>
+          <div id="watch-banner" class="watch-banner" hidden>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg>
+            <p id="watch-text" role="status"></p>
+            <button id="stop-watch" class="btn btn-secondary btn-small" type="button">Stop</button>
+          </div>
           <div id="bus-notifications" class="bus-notifications" aria-live="polite"></div>
-          <p class="fine-print">These estimates are illustrative and do not reflect current traffic or an official timetable.</p>
+          <ul id="eta-results" class="arrivals-board" aria-label="Buses on this route"></ul>
+          <p id="notification-message" class="fine-print" role="status"></p>
+          <p id="fleet-message" class="fine-print" role="status"></p>
+          <p class="fine-print">Estimates are illustrative, not an official timetable.</p>
         </div>
       </div>
     </section>
 
     <section id="alerts" class="section section-alt">
       <div class="container">
-        <div class="section-head">
-          <div>
-            <p class="eyebrow eyebrow-dark">TRAVEL INFORMATION</p>
-            <h2 class="heading-with-icon">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg>
-              Service information
-            </h2>
-          </div>
-        </div>
+        <h2>Service alerts</h2>
         <div id="alerts-list" class="alerts-list"></div>
       </div>
     </section>
   </main>
 
   <footer class="site-footer">
-    <div class="container footer-shell">
-      <div class="footer-feature">
-        <div class="footer-mark">
-          <a href="index.html" class="footer-brand">JUTC <span>Bus Tracker</span></a>
-        </div>
-        <div class="footer-facts">
-          <div><span>LOCATION</span><strong>Kingston, Jamaica</strong></div>
-        </div>
-      </div>
-      <div class="footer-main">
-        <div class="footer-columns">
-          <div class="footer-group">
-            <h2>Information</h2>
-            <a href="#routes">Routes</a>
-            <a href="#alerts">Service information</a>
-          </div>
-          <div class="footer-group">
-            <h2>Plan a journey</h2>
-            <a href="#tracker">Map preview</a>
-            <a href="#eta">Arrival estimates</a>
-          </div>
-          <div class="footer-group"><h2>Staff</h2><a href="driver.html">Bus drivers</a><a href="admin.html">Route management</a></div>
-        </div>
-        <div class="footer-bottom">
-          <p>© 2026 JUTC Bus Tracker. All rights reserved.</p>
-        </div>
-      </div>
+    <div class="container footer-inner">
+      <a href="index.html" class="logo">JUTC <span>Bus Tracker</span></a>
+      <nav class="footer-links" aria-label="Staff"><a href="driver.html">Bus drivers</a><a href="admin.html">Route management</a></nav>
+      <p>© 2026 JUTC Bus Tracker · Kingston, Jamaica</p>
     </div>
   </footer>
 

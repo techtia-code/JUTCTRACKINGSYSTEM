@@ -1,6 +1,7 @@
 import { demoLogIn, getSession, loadAssignedBuses, loadMyRoute, loadRoutes, logIn, logOut, updateBus } from './data.js';
-import { BUS_UPDATE_INTERVAL_MS } from './fleet.js';
+import { BUS_UPDATE_INTERVAL_MS, busName } from './fleet.js';
 import { makeElement } from './dom.js';
+import { routeLabel } from './planner.js';
 import { isDemoMode } from './supabase.js';
 
 export async function initDriver() {
@@ -14,15 +15,14 @@ export async function initDriver() {
     details.replaceChildren(); start.disabled = !bus || bus.engineOn; stop.disabled = !bus || !bus.engineOn; saveStatus.disabled = !bus;
     if (!bus) { details.append(makeElement('p', 'empty-state', 'No buses are assigned to this account. Ask an administrator to assign a bus.')); return; }
     status.value = bus.status;
-    details.append(makeElement('h3', '', bus.label),
-      makeElement('p', '', routes.find(r => r.id === bus.routeId)?.name || 'Route unavailable'),
-      makeElement('p', '', `Engine ${bus.engineOn ? 'on' : 'off'} · ${bus.status === 'delayed' ? 'Delayed' : 'On time'}`),
-      makeElement('p', '', `Saved position: ${bus.lat.toFixed(5)}, ${bus.lng.toFixed(5)} · Next stop: ${bus.nextStop || 'Not available'}`),
-      makeElement('p', 'fine-print', `Last location update: ${bus.updatedAt ? new Date(bus.updatedAt).toLocaleTimeString() : 'Not available'}`));
+    details.append(makeElement('h3', '', busName(bus)),
+      makeElement('p', '', routeLabel(routes.find(r => r.id === bus.routeId)) || 'Route unavailable'),
+      makeElement('p', '', `Engine ${bus.engineOn ? 'on' : 'off'} · ${bus.status === 'delayed' ? 'Delayed' : 'On time'} · Next stop: ${bus.nextStop || 'Not available'}`),
+      makeElement('p', 'fine-print', `Last update: ${bus.updatedAt ? new Date(bus.updatedAt).toLocaleTimeString() : 'Not available'}`));
   }
   async function refresh() {
     const previous = select.value; buses = await loadAssignedBuses(); select.replaceChildren();
-    buses.forEach(bus => { const option = makeElement('option', '', bus.label); option.value = bus.id; select.append(option); });
+    buses.forEach(bus => { const option = makeElement('option', '', busName(bus)); option.value = bus.id; select.append(option); });
     if (buses.some(b => b.id === previous)) select.value = previous;
     render();
   }

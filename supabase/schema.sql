@@ -18,10 +18,13 @@ create table stops (
   lng double precision not null
 );
 
+-- number is the JUTC-style route number shown on the bus, such as 22, 21A or 900.
 create table routes (
   id uuid primary key default gen_random_uuid(),
-  name text not null unique
+  name text not null unique,
+  number text constraint routes_number_format check (number ~ '^[0-9]{1,3}[A-Z]{0,3}$')
 );
+create unique index routes_number_key on routes (number);
 
 create table route_stops (
   route_id uuid not null references routes (id) on delete cascade,
@@ -68,10 +71,11 @@ insert into stops (name, lat, lng) values
   ('Angels', 18.0406, -76.9795),
   ('Ferry', 18.0235, -76.8770);
 
-insert into routes (name) values
-  ('Downtown Kingston to Half-Way Tree'),
-  ('Half-Way Tree to Papine'),
-  ('Spanish Town to Downtown Kingston');
+-- Illustrative route numbers modelled on real JUTC corridors, not official service information.
+insert into routes (name, number) values
+  ('Downtown Kingston to Half-Way Tree', '32'),
+  ('Half-Way Tree to Papine', '900'),
+  ('Spanish Town to Downtown Kingston', '22');
 
 insert into route_stops (route_id, stop_id, position)
 select routes.id, stops.id, sample.position
@@ -276,6 +280,22 @@ grant execute on function public.is_admin() to authenticated;
 revoke all on function public.jutc_save_route(uuid,text,text[]), public.create_bus(text,uuid,uuid), public.assign_bus(uuid,uuid), public.driver_update_bus(uuid,text,text) from public, anon;
 grant execute on function public.jutc_save_route(uuid,text,text[]), public.create_bus(text,uuid,uuid), public.assign_bus(uuid,uuid), public.driver_update_bus(uuid,text,text) to authenticated;
 
+-- Saves a route and its number in one step for the admin page. Stop edits call the
+-- three-argument jutc_save_route, which keeps each route's number.
+create or replace function public.jutc_save_numbered_route(p_route_id uuid, p_name text, p_stops text[], p_number text)
+returns uuid language plpgsql security definer set search_path = public, pg_temp as $$
+declare result_id uuid; clean_number text := upper(trim(p_number));
+begin
+  if not public.is_admin() then raise exception 'Administrator access required'; end if;
+  if clean_number is null or clean_number !~ '^[0-9]{1,3}[A-Z]{0,3}$' then raise exception 'Enter a route number such as 22, 21A or 900'; end if;
+  if exists(select 1 from public.routes where number = clean_number and id is distinct from p_route_id) then raise exception 'Another route already uses that number'; end if;
+  result_id := public.jutc_save_route(p_route_id, p_name, p_stops);
+  update public.routes set number = clean_number where id = result_id;
+  return result_id;
+end $$;
+revoke all on function public.jutc_save_numbered_route(uuid,text,text[],text) from public, anon;
+grant execute on function public.jutc_save_numbered_route(uuid,text,text[],text) to authenticated;
+
 -- Preserve any legacy implementation and signature, but prevent it bypassing the new role rules.
 do $$ begin
   if to_regprocedure('public.save_route(uuid,text,text[])') is not null then
@@ -284,8 +304,8 @@ do $$ begin
 end $$;
 
 -- An extra illustrative route, only when its stops exist. No official timetable is implied.
-insert into public.routes(name)
-select 'Cross Roads to Papine' where (select count(*) from public.stops where name in ('Cross Roads','Half-Way Tree','Liguanea','Papine')) = 4
+insert into public.routes(name, number)
+select 'Cross Roads to Papine', '68' where (select count(*) from public.stops where name in ('Cross Roads','Half-Way Tree','Liguanea','Papine')) = 4
 on conflict (name) do nothing;
 insert into public.route_stops(route_id, stop_id, position)
 select r.id, s.id, v.position from (values ('Cross Roads',1),('Half-Way Tree',2),('Liguanea',3),('Papine',4)) v(name,position)
@@ -294,9 +314,9 @@ where r.name = 'Cross Roads to Papine' and not exists(select 1 from public.route
 on conflict do nothing;
 
 -- Simulation runs by default; a driver or administrator can park or restart a bus.
--- Numbered demonstration fleet labels; these are not verified official fleet IDs.
+-- Demonstration fleet numbers (1001, 1002, ...); these are not verified official fleet IDs.
 insert into public.buses(label,route_id,lat,lng,next_stop)
-select 'JUTC-' || (1000 + row_number() over (order by r.name, r.id))::text, r.id, first_stop.lat, first_stop.lng, second_stop.name
+select (1000 + row_number() over (order by r.name, r.id))::text, r.id, first_stop.lat, first_stop.lng, second_stop.name
 from public.routes r
 join lateral (select s.* from public.route_stops rs join public.stops s on s.id = rs.stop_id where rs.route_id = r.id order by rs.position limit 1) first_stop on true
 join lateral (select s.* from public.route_stops rs join public.stops s on s.id = rs.stop_id where rs.route_id = r.id order by rs.position offset 1 limit 1) second_stop on true

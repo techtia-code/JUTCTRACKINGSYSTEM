@@ -3,9 +3,11 @@ import { test } from "node:test";
 import {
   findJourneys,
   isInJamaica,
+  routeLabel,
   routeMatchesSearch,
   validateAlert,
   validateRoute,
+  validateRouteNumber,
   validateStop
 } from "../JS/planner.js";
 
@@ -44,6 +46,25 @@ test("route search matches route names and stops", () => {
   assert.equal(routeMatchesSearch(routes[0], "downtown"), true);
   assert.equal(routeMatchesSearch(routes[1], "liguanea"), true);
   assert.equal(routeMatchesSearch(routes[1], "cross roads"), false);
+});
+
+test("route search and labels use the JUTC route number", () => {
+  const numbered = { ...routes[1], number: "900" };
+  assert.equal(routeMatchesSearch(numbered, "900"), true);
+  assert.equal(routeMatchesSearch(numbered, "22"), false);
+  assert.equal(routeLabel(numbered), "900 · Half-Way Tree to Papine");
+  assert.equal(routeLabel(routes[0]), "Downtown to Half-Way Tree", "a route without a number shows just its name");
+});
+
+test("route numbers follow the JUTC style and are unique", () => {
+  const numbered = [{ ...routes[0], number: "22" }, { ...routes[1], number: "21A" }];
+  assert.deepEqual(validateRouteNumber(" 21ax ", [], null), { number: "21AX" });
+  assert.deepEqual(validateRouteNumber("900", numbered, null), { number: "900" });
+  for (const bad of ["", "A22", "1234", "22-A", "22ABCD", "JUTC-SAMPLE-1a2b"]) {
+    assert.equal(validateRouteNumber(bad, numbered, null).field, "number", bad + " must be rejected");
+  }
+  assert.match(validateRouteNumber("21a", numbered, null).error, /already/);
+  assert.deepEqual(validateRouteNumber("21A", numbered, "b"), { number: "21A" }, "a route can keep its own number");
 });
 
 test("accepts a valid route and corrects the stop capitalization", () => {

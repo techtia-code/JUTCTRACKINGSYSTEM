@@ -35,7 +35,31 @@ export function findJourneys(routes, stops, startName, endName) {
 
 export function routeMatchesSearch(route, search) {
   const normalSearch = search.trim().toLocaleLowerCase();
-  return [route.name, ...route.stops].some(text => text.toLocaleLowerCase().includes(normalSearch));
+  return [route.number, route.name, ...route.stops].filter(Boolean)
+    .some(text => text.toLocaleLowerCase().includes(normalSearch));
+}
+
+// "22 · Spanish Town to Downtown Kingston", or just the name when a route
+// has no number yet.
+export function routeLabel(route) {
+  if (!route) return "";
+  return route.number ? route.number + " · " + route.name : route.name;
+}
+
+// JUTC-style route numbers: 22, 21A, 21AX, 900.
+// Returns { error, field } when invalid, otherwise { number }.
+export function validateRouteNumber(enteredNumber, routes, editingId) {
+  const number = String(enteredNumber ?? "").trim().toUpperCase();
+  if (!/^\d{1,3}[A-Z]{0,3}$/.test(number)) {
+    return { error: "Enter a route number such as 22, 21A or 900.", field: "number" };
+  }
+  const duplicate = routes.some(route =>
+    route.id !== editingId && String(route.number ?? "").toUpperCase() === number
+  );
+  if (duplicate) {
+    return { error: "Another route already uses that number.", field: "number" };
+  }
+  return { number };
 }
 
 // Returns { error, field } when the form is invalid, otherwise { name, stops }.

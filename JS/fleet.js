@@ -1,7 +1,46 @@
-import { AVERAGE_SPEED_METRES_PER_SECOND, findBusPosition, findPositionFromTravelled, getEtaMinutes, getTravelledFromLocation, makeRoutePath } from './simulation.js';
+import { AVERAGE_SPEED_METRES_PER_SECOND, findBusPosition, findPositionFromTravelled, getDirectionAtStop, getDirectionFromTravelled, getEtaFromTravelled, getTravelledFromLocation, makeRoutePath } from './simulation.js';
 
 export const BUS_UPDATE_INTERVAL_MS = 5000;
 export const STALE_AFTER_MS = 60000;
+
+// Riders know a JUTC service by its route number ("the 22"); each bus also
+// carries a fleet number. Older saved labels may still read "JUTC-1001".
+const FLEET_NUMBER = /^(?:JUTC-)?(\d{3,5})$/i;
+
+export function busName(bus) {
+  const label = String(bus?.label ?? '').trim();
+  const number = label.match(FLEET_NUMBER)?.[1];
+  return number ? `Bus ${number}` : label || 'Bus';
+}
+
+// Returns { number } or { error }. Admins enter just the digits, e.g. 1005.
+export function validateFleetNumber(entered, buses = []) {
+  const number = String(entered ?? '').trim().match(FLEET_NUMBER)?.[1];
+  if (!number) return { error: 'Enter a fleet number of 3 to 5 digits, for example 1005.' };
+  if (buses.some(bus => String(bus.label ?? '').trim().match(FLEET_NUMBER)?.[1] === number)) return { error: 'Another bus already uses that fleet number.' };
+  return { number };
+}
+
+export const BUS_STATE_LABELS = { parked: 'Parked', stale: 'Location stale', delayed: 'Delayed', running: 'Running' };
+
+export function busState(bus, now = Date.now()) {
+  if (!bus.engineOn) return 'parked';
+  if (!isFresh(bus, now)) return 'stale';
+  return bus.status === 'delayed' ? 'delayed' : 'running';
+}
+
+// Every bus on the route with its estimate for one stop and the way it will
+// be going from there: soonest first, buses without an estimate (parked or
+// stale) last.
+export function arrivalsAtStop(buses, route, coordinates, stop, delay = 0, now = Date.now()) {
+  return buses.filter(bus => bus.routeId === route.id)
+    .map(bus => {
+      const minutes = busEtaMinutes(bus, route, coordinates, stop, delay, now);
+      return { bus, state: busState(bus, now), minutes, heading: minutes === null ? null : busHeading(bus, route, coordinates, stop, now) };
+    })
+    .sort((a, b) => ((a.minutes ?? Infinity) - (b.minutes ?? Infinity)) ||
+      busName(a.bus).localeCompare(busName(b.bus), undefined, { numeric: true }));
+}
 
 // Route-based driver feeds have no fleet ID. Keep them separate rather than overwrite every bus on that route.
 export function routeSharedBuses(routes, coordinates, locations) {
@@ -9,7 +48,7 @@ export function routeSharedBuses(routes, coordinates, locations) {
     const location = locations.get(route.id); if (!location) return [];
     const path = makeRoutePath(route, coordinates);
     const travelled = getTravelledFromLocation(path, location.latLng, location.direction);
-    return [{ id: `route-shared:${route.id}`, label: `Driver-shared bus · ${route.name}`, routeId: route.id,
+    return [{ id: `route-shared:${route.id}`, label: 'Live driver bus', routeId: route.id,
       engineOn: true, status: 'on_time', lat: location.latLng[0], lng: location.latLng[1],
       updatedAt: location.updatedAt, locationProgressSeconds: travelled / AVERAGE_SPEED_METRES_PER_SECOND,
       nextStop: findPositionFromTravelled(route, path, travelled).nextStop, source: 'driver' }];
@@ -39,27 +78,30 @@ export function isFresh(bus, now = Date.now()) {
   return Number.isFinite(timestamp) && now - timestamp <= STALE_AFTER_MS && now - timestamp >= -10000;
 }
 
+// Metres the bus has travelled on its round trip (see simulation.js). Persisted
+// progress corresponds to the last published coordinates, not a wall-clock projection.
+export function busTravelled(bus, now = Date.now()) {
+  return (bus.preview ? elapsedSeconds(bus, now) : (bus.locationProgressSeconds ?? bus.progressSeconds ?? 0)) * AVERAGE_SPEED_METRES_PER_SECOND;
+}
+
 export function busEtaMinutes(bus, route, coordinates, stop, delay = 0, now = Date.now()) {
   if (!bus || !bus.engineOn || !isFresh(bus, now) || !route.stops.includes(stop)) return null;
-  // Persisted progress corresponds to the last published coordinates, not a wall-clock projection.
-  const seconds = bus.preview ? elapsedSeconds(bus, now) : (bus.locationProgressSeconds ?? bus.progressSeconds ?? 0);
-  return getEtaMinutes(route, makeRoutePath(route, coordinates), stop, seconds * 1000, delay);
+  return getEtaFromTravelled(route, makeRoutePath(route, coordinates), stop, busTravelled(bus, now), delay);
+}
+
+// The end of the route a running bus is heading for, like the sign on its
+// front. Given a stop, the way it will be going when it leaves that stop.
+export function busHeading(bus, route, coordinates, stop = null, now = Date.now()) {
+  if (!bus?.engineOn || !route) return null;
+  const path = makeRoutePath(route, coordinates), travelled = busTravelled(bus, now);
+  const direction = stop ? getDirectionAtStop(route, path, stop, travelled) : getDirectionFromTravelled(path, travelled);
+  return direction === 'outbound' ? route.stops.at(-1) : route.stops[0];
 }
 
 export function getBusAlerts(bus, distanceMetres, routeDelayed = false, now = Date.now()) {
   if (!bus || !bus.engineOn || !isFresh(bus, now)) return [];
   const alerts = [];
-  if (Number.isFinite(distanceMetres) && distanceMetres <= 1000) alerts.push({ type: 'nearby', message: `${bus.label} is within 1 km of your selected stop.` });
-  if (bus.status === 'delayed' || routeDelayed) alerts.push({ type: 'delay', message: `${bus.label} has a reported delay.` });
+  if (Number.isFinite(distanceMetres) && distanceMetres <= 1000) alerts.push({ type: 'nearby', message: `${busName(bus)} is within 1 km of your stop.` });
+  if (bus.status === 'delayed' || routeDelayed) alerts.push({ type: 'delay', message: `${busName(bus)} has a reported delay.` });
   return alerts;
-}
-
-export function validateStop(name, latitude, longitude, stops) {
-  name = name.trim();
-  if (name.length < 3 || name.length > 100) return { error: 'Enter a stop name between 3 and 100 characters.' };
-  if (String(latitude).trim() === '' || String(longitude).trim() === '') return { error: 'Enter both latitude and longitude.' };
-  const lat = Number(latitude), lng = Number(longitude);
-  if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) return { error: 'Enter valid latitude (-90 to 90) and longitude (-180 to 180).' };
-  if (stops.some(stop => stop.name.toLocaleLowerCase() === name.toLocaleLowerCase())) return { error: 'A stop already uses that name.' };
-  return { name, lat, lng };
 }

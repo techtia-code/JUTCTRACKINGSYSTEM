@@ -16,6 +16,16 @@ test('driver simulation advances a running bus and freezes a stopped bus', () =>
   const stopped = fleet.simulateBus({ ...bus, engineOn: false, startedAt: null, progressSeconds: 0 }, route, coordinates, now);
   assert.equal(stopped.lat, 18);
 });
+test('a bus heads for the end of the route it is driving towards, and turns round at each end', () => {
+  assert.equal(fleet.busHeading(bus, route, coordinates, null, now), 'C');
+  assert.equal(fleet.busHeading({ ...bus, progressSeconds: 300 }, route, coordinates, null, now), 'A', 'past C, it is on the way back');
+  // Given a stop, the way the bus will be going when it gets there.
+  assert.equal(fleet.busHeading(bus, route, coordinates, 'B', now), 'C');
+  assert.equal(fleet.busHeading({ ...bus, progressSeconds: 150 }, route, coordinates, 'B', now), 'A', 'just past B, it next reaches B on the way back');
+  assert.equal(fleet.busHeading({ ...bus, progressSeconds: 150 }, route, coordinates, 'A', now), 'C');
+  assert.equal(fleet.busHeading(bus, route, coordinates, 'C', now), 'A');
+  assert.equal(fleet.busHeading({ ...bus, engineOn: false }, route, coordinates, null, now), null);
+});
 test('different buses on the same route have independent positions', () => {
   assert.equal(typeof fleet.simulateBus, 'function');
   assert.notEqual(fleet.simulateBus(bus, route, coordinates, now).lat,
@@ -59,13 +69,33 @@ test('proximity alerts include the 1km boundary and exclude stopped/stale buses'
   assert.equal(fleet.getBusAlerts({ ...bus, status: 'delayed' }, 3000, false, now)[0].type, 'delay');
   assert.equal(fleet.getBusAlerts(bus, 3000, true, now)[0].type, 'delay');
 });
-test('stop validation rejects invalid coordinates and duplicate names', () => {
-  assert.equal(typeof fleet.validateStop, 'function');
-  assert.ok(fleet.validateStop('New stop', '', '-76', []).error);
-  assert.ok(fleet.validateStop('New stop', '91', '-76', []).error);
-  assert.ok(fleet.validateStop('New stop', '18', '181', []).error);
-  assert.ok(fleet.validateStop(' papine ', '18', '-76', [{ name: 'Papine' }]).error);
-  assert.deepEqual(fleet.validateStop(' New stop ', '18', '-76', []), { name: 'New stop', lat: 18, lng: -76 });
+test('buses are named by fleet number, including older JUTC- labels', () => {
+  assert.equal(fleet.busName({ label: '1004' }), 'Bus 1004');
+  assert.equal(fleet.busName({ label: 'JUTC-1001' }), 'Bus 1001');
+  assert.equal(fleet.busName({ label: 'Live driver bus' }), 'Live driver bus');
+  assert.match(fleet.getBusAlerts({ ...bus, label: '1004' }, 500, false, now)[0].message, /^Bus 1004 is within 1 km/);
+});
+test('fleet numbers are 3 to 5 unique digits', () => {
+  assert.deepEqual(fleet.validateFleetNumber(' 1005 ', []), { number: '1005' });
+  assert.deepEqual(fleet.validateFleetNumber('JUTC-1005', []), { number: '1005' });
+  for (const bad of ['', '12', '123456', 'JUTC-SAMPLE-1a2b3c4d', 'BUS']) assert.ok(fleet.validateFleetNumber(bad, []).error, bad);
+  assert.match(fleet.validateFleetNumber('1001', [{ label: 'JUTC-1001' }]).error, /already/);
+});
+test('arrivals list the route buses soonest first, with parked and stale buses last', () => {
+  const buses = [
+    { ...bus, id: 'parked', label: '1001', engineOn: false, startedAt: null },
+    { ...bus, id: 'far', label: '1003', progressSeconds: 0 },
+    { ...bus, id: 'stale', label: '1004', updatedAt: new Date(now - 120000).toISOString() },
+    { ...bus, id: 'near', label: '1002', progressSeconds: 200, status: 'delayed' },
+    { ...bus, id: 'other-route', label: '1005', routeId: 'r2' }
+  ];
+  const arrivals = fleet.arrivalsAtStop(buses, route, coordinates, 'C', 0, now);
+  assert.deepEqual(arrivals.map(a => a.bus.id), ['near', 'far', 'parked', 'stale']);
+  assert.deepEqual(arrivals.map(a => a.state), ['delayed', 'running', 'parked', 'stale']);
+  assert.ok(arrivals[0].minutes < arrivals[1].minutes);
+  assert.equal(arrivals[2].minutes, null);
+  assert.equal(arrivals[3].minutes, null);
+  assert.equal(fleet.arrivalsAtStop(buses, route, coordinates, 'C', 5, now)[0].minutes, arrivals[0].minutes + 5, 'route delays are included');
 });
 test('route-shared positions stay separate from individual fleet buses and retain their coordinates', () => {
   const locations = new Map([['r1', { latLng: [18.005, -76.8], direction: 'outbound', updatedAt: new Date(now).toISOString() }]]);

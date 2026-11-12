@@ -3,79 +3,52 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b6e4f" />
   <meta name="description" content="Manage sample bus routes for the JUTC Bus Tracker demonstration." />
   <title>Route management | JUTC Bus Tracker</title>
   <link rel="stylesheet" href="./STYLES/style.css" />
 </head>
 <body data-page="admin">
-  <div id="loading-root"></div>
   <header class="site-header">
     <div class="container header-inner">
       <a href="index.html" class="logo">JUTC <span>Bus Tracker</span></a>
-      <nav class="nav" aria-label="Main navigation">
-        <a href="driver.html">Driver console</a>
-        <a href="index.html#routes" class="nav-icon-link">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6 9 3l6 3 6-3v15l-6 3-6-3-6 3V6Z"></path><path d="M9 3v15m6-12v15"></path></svg>
-          Sample routes
-        </a>
-        <a href="index.html#tracker" class="nav-icon-link">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-11a8 8 0 1 0-16 0c0 7 8 11 8 11Z"></path><circle cx="12" cy="11" r="2.5"></circle></svg>
-          Map preview
-        </a>
-        <a href="index.html" class="btn route-management-link">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
-          Back to journey planner
-        </a>
-      </nav>
+      <nav class="nav" aria-label="Main navigation"><a href="index.html">Journey planner</a></nav>
     </div>
   </header>
 
-  <main class="admin-main">
-    <section class="admin-intro">
-      <div class="container admin-intro-row">
-        <h1>Route management</h1>
-        <button id="sign-out" type="button" class="btn btn-secondary" hidden>Sign out</button>
-      </div>
+  <main class="container page-main">
+    <div class="page-head">
+      <h1>Route management</h1>
+      <button id="sign-out" type="button" class="btn btn-secondary btn-small" hidden>Sign out</button>
+    </div>
+
+    <section id="login-card" class="admin-card login-card" aria-labelledby="login-heading" hidden>
+      <h2 id="login-heading">Administrator login</h2>
+      <form id="login-form" class="route-form">
+        <div class="field">
+          <label for="login-email">Email or admin username</label>
+          <input id="login-email" name="email" type="text" autocomplete="username" placeholder="JUTCAdmin2026 or your email" required />
+        </div>
+        <div class="field">
+          <label for="login-password">Password</label>
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+        </div>
+        <button id="login-button" type="submit" class="btn btn-primary">Log in</button>
+      </form>
+      <p id="login-message" class="admin-message" aria-live="polite"></p>
     </section>
 
-    <section class="section admin-section">
-      <div class="container">
-        <section id="login-card" class="admin-card login-card" aria-labelledby="login-heading" hidden>
-          <div class="section-head">
-            <div>
-              <p class="eyebrow eyebrow-dark">AUTHORIZED PERSONNEL</p>
-              <h2 id="login-heading">Administrator login</h2>
-            </div>
-          </div>
-          <form id="login-form" class="route-form">
-            <div class="field">
-              <label for="login-email">Email or admin username</label>
-              <input id="login-email" name="email" type="text" autocomplete="username" placeholder="JUTCAdmin2026 or your email" required />
-            </div>
-            <div class="field">
-              <label for="login-password">Password</label>
-              <input id="login-password" name="password" type="password" autocomplete="current-password" required />
-            </div>
-            <div class="form-actions">
-              <button id="login-button" type="submit" class="btn btn-primary">Log in</button>
-            </div>
-          </form>
-          <p id="login-message" class="admin-message" aria-live="polite"></p>
-        </section>
-      </div>
-
-      <div id="admin-content" class="container admin-layout" hidden>
-        <section class="admin-card" aria-labelledby="route-form-heading">
-          <div class="section-head">
-            <div>
-              <p class="eyebrow eyebrow-dark">ROUTE DETAILS</p>
-              <h2 id="route-form-heading" class="heading-with-icon">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14m-7-7h14"></path></svg>
-                Add a sample route
-              </h2>
-            </div>
-          </div>
+    <div id="admin-content" class="admin-layout" hidden>
+      <details class="admin-card" open>
+        <summary><h2>Routes</h2><span id="route-count" class="route-count"></span></summary>
+        <div class="admin-panel">
           <form id="route-form" class="route-form">
+            <h3 id="route-form-heading">Add a sample route</h3>
+            <div class="field">
+              <label for="route-number">Route number</label>
+              <input id="route-number" name="routeNumber" type="text" maxlength="6" autocomplete="off" placeholder="For example, 22 or 21A" required />
+              <p class="field-help">The number on the front of the bus, such as 22, 21A or 900.</p>
+            </div>
             <div class="field">
               <label for="route-name">Route name</label>
               <input id="route-name" name="routeName" type="text" maxlength="60" placeholder="For example, Downtown to Half-Way Tree" required />
@@ -86,38 +59,20 @@
               <p class="field-help">Use these sample stops: <span id="available-stops"></span></p>
             </div>
             <div class="form-actions">
-              <button id="save-route" type="submit" class="btn btn-primary">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14m-7-7h14"></path></svg>
-                Add route
-              </button>
+              <button id="save-route" type="submit" class="btn btn-primary">Add route</button>
               <button id="cancel-edit" type="button" class="btn btn-secondary" hidden>Cancel</button>
             </div>
+            <p id="admin-message" class="admin-message" aria-live="polite"></p>
           </form>
-          <p id="admin-message" class="admin-message" aria-live="polite"></p>
-        </section>
-
-        <section class="admin-card" aria-labelledby="saved-routes-heading">
-          <div class="section-head">
-            <div>
-              <p class="eyebrow eyebrow-dark">CURRENT ROUTES</p>
-              <h2 id="saved-routes-heading" class="heading-with-icon">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6 9 3l6 3 6-3v15l-6 3-6-3-6 3V6Z"></path><path d="M9 3v15m6-12v15"></path></svg>
-                Sample route list
-              </h2>
-            </div>
-            <span id="route-count" class="route-count"></span>
-          </div>
           <div id="admin-routes" class="admin-routes" aria-live="polite"></div>
-        </section>
+        </div>
+      </details>
 
-        <section class="admin-card" aria-labelledby="stop-form-heading">
-          <div class="section-head">
-            <div>
-              <p class="eyebrow eyebrow-dark">STOP DETAILS</p>
-              <h2 id="stop-form-heading" class="heading-with-icon">Add a stop</h2>
-            </div>
-          </div>
+      <details class="admin-card">
+        <summary><h2>Stops</h2><span id="stop-count" class="route-count"></span></summary>
+        <div class="admin-panel">
           <form id="stop-form" class="route-form" novalidate>
+            <h3 id="stop-form-heading">Add a stop</h3>
             <div class="field">
               <label for="stop-name">Stop name</label>
               <input id="stop-name" name="stopName" type="text" maxlength="60" placeholder="For example, Barbican Square" required />
@@ -125,41 +80,29 @@
             <div class="field-row">
               <div class="field">
                 <label for="stop-lat">Latitude</label>
-                <input id="stop-lat" name="stopLat" type="number" step="any" min="17.6" max="18.6" placeholder="18.0119" required />
+                <input id="stop-lat" name="stopLat" type="number" inputmode="decimal" step="any" min="17.6" max="18.6" placeholder="18.0119" required />
               </div>
               <div class="field">
                 <label for="stop-lng">Longitude</label>
-                <input id="stop-lng" name="stopLng" type="number" step="any" min="-78.4" max="-76.1" placeholder="-76.7969" required />
+                <input id="stop-lng" name="stopLng" type="number" inputmode="decimal" step="any" min="-78.4" max="-76.1" placeholder="-76.7969" required />
               </div>
             </div>
-            <p class="field-help">To find a stop's coordinates, right-click the place in Google Maps or OpenStreetMap and copy the two numbers.</p>
+            <p class="field-help">To find a stop's coordinates, long-press (or right-click) the place in Google Maps or OpenStreetMap and copy the two numbers.</p>
             <div class="form-actions">
               <button id="save-stop" type="submit" class="btn btn-primary">Add stop</button>
               <button id="cancel-stop-edit" type="button" class="btn btn-secondary" hidden>Cancel</button>
             </div>
+            <p id="stop-message" class="admin-message" aria-live="polite"></p>
           </form>
-          <p id="stop-message" class="admin-message" aria-live="polite"></p>
-        </section>
-
-        <section class="admin-card" aria-labelledby="saved-stops-heading">
-          <div class="section-head">
-            <div>
-              <p class="eyebrow eyebrow-dark">CURRENT STOPS</p>
-              <h2 id="saved-stops-heading">Stop list</h2>
-            </div>
-            <span id="stop-count" class="route-count"></span>
-          </div>
           <div id="admin-stops" class="admin-routes" aria-live="polite"></div>
-        </section>
+        </div>
+      </details>
 
-        <section class="admin-card" aria-labelledby="alert-form-heading">
-          <div class="section-head">
-            <div>
-              <p class="eyebrow eyebrow-dark">SERVICE INFORMATION</p>
-              <h2 id="alert-form-heading">Publish a service alert</h2>
-            </div>
-          </div>
+      <details class="admin-card">
+        <summary><h2>Service alerts</h2></summary>
+        <div class="admin-panel">
           <form id="alert-form" class="route-form">
+            <h3>Publish a service alert</h3>
             <div class="field">
               <label for="alert-type">Alert type</label>
               <select id="alert-type" name="alertType"></select>
@@ -174,61 +117,66 @@
             </div>
             <div class="field">
               <label for="alert-delay">Delay in minutes</label>
-              <input id="alert-delay" name="alertDelay" type="number" min="0" max="120" step="1" value="0" required />
-              <p class="field-help">This is added to the arrival estimates for the route affected.</p>
+              <input id="alert-delay" name="alertDelay" type="number" inputmode="numeric" min="0" max="120" step="1" value="0" required />
+              <p class="field-help">Added to the arrival estimates for the route affected.</p>
             </div>
-            <div class="form-actions">
-              <button type="submit" class="btn btn-primary">Publish alert</button>
-            </div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Publish alert</button></div>
+            <p id="alert-feedback" class="admin-message" aria-live="polite"></p>
           </form>
-          <p id="alert-feedback" class="admin-message" aria-live="polite"></p>
-        </section>
-
-        <section class="admin-card" aria-labelledby="saved-alerts-heading">
-          <div class="section-head">
-            <div>
-              <p class="eyebrow eyebrow-dark">CURRENT ALERTS</p>
-              <h2 id="saved-alerts-heading">Service alert list</h2>
-            </div>
-          </div>
           <div id="admin-alerts" class="admin-routes" aria-live="polite"></div>
-        </section>
-      </div>
-    </section>
+        </div>
+      </details>
+
+      <details class="admin-card">
+        <summary><h2>Buses and drivers</h2></summary>
+        <p class="fine-print">Simulated buses run automatically. Drivers stop or restart them from the driver console.</p>
+        <div class="admin-panel">
+          <div id="fleet-management">
+            <form id="fleet-form" class="route-form">
+              <h3>Add a bus</h3>
+              <div class="field">
+                <label for="new-bus-label">Fleet number</label>
+                <input id="new-bus-label" type="text" inputmode="numeric" pattern="[0-9]{3,5}" maxlength="5" placeholder="For example, 1005" title="Enter 3 to 5 digits, like the number painted on the bus." required />
+              </div>
+              <div class="field">
+                <label for="new-bus-route">Route</label>
+                <select id="new-bus-route" required></select>
+              </div>
+              <div class="field">
+                <label for="new-bus-driver">Driver name or email (optional)</label>
+                <input id="new-bus-driver" type="text" maxlength="254" />
+              </div>
+              <div class="form-actions"><button type="submit" class="btn btn-primary">Add bus</button></div>
+            </form>
+            <p id="fleet-feedback" class="admin-message" role="status"></p>
+          </div>
+          <div id="assignment-management">
+            <form id="assignment-form" class="route-form">
+              <h3>Assign a driver</h3>
+              <div class="field">
+                <label for="assign-bus">Bus</label>
+                <select id="assign-bus" required></select>
+              </div>
+              <div class="field">
+                <label for="assign-driver">Driver name or email (leave empty to unassign)</label>
+                <input id="assign-driver" type="text" maxlength="254" />
+                <p class="field-help">Use an existing driver account, or their email if names are shared. Stop a running bus before changing its driver.</p>
+              </div>
+              <div class="form-actions"><button type="submit" class="btn btn-primary">Save assignment</button></div>
+            </form>
+            <p id="assignment-feedback" class="admin-message" role="status"></p>
+          </div>
+        </div>
+        <ul id="fleet-list" class="fleet-list"></ul>
+      </details>
+    </div>
   </main>
 
   <footer class="site-footer">
-    <div class="container footer-shell">
-      <div class="footer-feature">
-        <div class="footer-mark">
-          <a href="index.html" class="footer-brand">JUTC <span>Bus Tracker</span></a>
-        </div>
-        <div class="footer-facts">
-          <div><span>LOCATION</span><strong>Kingston, Jamaica</strong></div>
-        </div>
-      </div>
-      <div class="footer-main">
-        <div class="footer-columns">
-          <div class="footer-group">
-            <h2>Information</h2>
-            <a href="index.html#routes">Routes</a>
-            <a href="index.html#alerts">Service information</a>
-          </div>
-          <div class="footer-group">
-            <h2>Plan a journey</h2>
-            <a href="index.html#tracker">Map preview</a>
-            <a href="index.html#eta">Arrival estimates</a>
-          </div>
-          <div class="footer-group">
-            <h2>Staff</h2>
-            <a href="driver.html">Bus drivers</a>
-            <a href="admin.html">Route management</a>
-          </div>
-        </div>
-        <div class="footer-bottom">
-          <p>© 2026 JUTC Bus Tracker. All rights reserved.</p>
-        </div>
-      </div>
+    <div class="container footer-inner">
+      <a href="index.html" class="logo">JUTC <span>Bus Tracker</span></a>
+      <nav class="footer-links" aria-label="Staff"><a href="driver.html">Bus drivers</a><a href="admin.html">Route management</a></nav>
+      <p>© 2026 JUTC Bus Tracker · Kingston, Jamaica</p>
     </div>
   </footer>
 

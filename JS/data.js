@@ -30,14 +30,22 @@ export async function loadStops() {
   if (isDemoMode()) return local().loadStops();
   return checked(await getSupabase().from('stops').select('id,name,lat,lng').order('name'));
 }
+const ROUTE_COLUMNS = 'id,name,route_stops(position,stops(name))';
 export async function loadRoutes() {
   if (isDemoMode()) return local().loadRoutes();
-  return checked(await getSupabase().from('routes').select('id,name,route_stops(position,stops(name))').order('name'))
-    .map(row => ({ id: row.id, name: row.name, stops: [...row.route_stops].sort((a, b) => a.position - b.position).map(s => s.stops.name) })).filter(r => r.stops.length >= 2);
+  let result = await getSupabase().from('routes').select(`number,${ROUTE_COLUMNS}`).order('name');
+  // Before supabase/update-route-numbers.sql runs there is no number column; show routes without numbers.
+  if (result.error?.code === '42703') result = await getSupabase().from('routes').select(ROUTE_COLUMNS).order('name');
+  return checked(result)
+    .map(row => ({ id: row.id, number: row.number || null, name: row.name, stops: [...row.route_stops].sort((a, b) => a.position - b.position).map(s => s.stops.name) }))
+    .filter(r => r.stops.length >= 2);
 }
-export async function saveRoute(routeId, name, stops) {
-  if (isDemoMode()) return local().saveRoute(routeId, name, stops);
-  return checked(await getSupabase().rpc('jutc_save_route', { p_route_id: routeId || null, p_name: name.trim(), p_stops: stops }));
+export async function saveRoute(routeId, name, stops, number) {
+  if (isDemoMode()) return local().saveRoute(routeId, name, stops, number);
+  const result = await getSupabase().rpc('jutc_save_numbered_route', { p_route_id: routeId || null, p_name: name.trim(), p_stops: stops, p_number: number });
+  if (result.error?.code === 'PGRST202') throw new Error('Route numbers require the database update in supabase/update-route-numbers.sql. Ask the project administrator to apply it.');
+  if (result.error?.code === '23505') throw new Error('Another route already uses that number.');
+  return checked(result);
 }
 export async function deleteRoute(id) {
   if (isDemoMode()) return local().deleteRoute(id);

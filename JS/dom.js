@@ -1,7 +1,8 @@
 const ICON_PATHS = {
   "plus": ["M12 5v14m-7-7h14"],
   "pencil": ["m16 4 4 4", "M4 20l4.5-1 11-11a2.1 2.1 0 0 0-4-4l-11 11L4 20Z"],
-  "trash": ["M3 6h18", "M8 6V4h8v2", "m19 6-1 14H6L5 6", "M10 11v5m4-5v5"]
+  "trash": ["M3 6h18", "M8 6V4h8v2", "m19 6-1 14H6L5 6", "M10 11v5m4-5v5"],
+  "bell": ["M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9", "M10 21h4"]
 };
 
 export function makeElement(tagName, className, text) {
@@ -29,6 +30,21 @@ export function makeIcon(name) {
     icon.append(path);
   });
   return icon;
+}
+
+// The route number in a gold badge, like the sign on the front of the bus.
+export function makeRouteBadge(number) {
+  const badge = makeElement("span", "route-badge", number);
+  badge.setAttribute("aria-label", "Route " + number);
+  return badge;
+}
+
+// A heading such as <h3>[22] Spanish Town to Downtown Kingston</h3>.
+export function makeRouteHeading(tagName, route, className = "") {
+  const heading = makeElement(tagName, ["route-heading", className].filter(Boolean).join(" "));
+  if (route.number) heading.append(makeRouteBadge(route.number), " ");
+  heading.append(document.createTextNode(route.name));
+  return heading;
 }
 
 export function setHeading(heading, iconName, label) {

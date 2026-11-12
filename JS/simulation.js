@@ -140,16 +140,33 @@ export function getDelayMinutes(alerts, routeId) {
     .reduce((total, alert) => total + alert.delayMinutes, 0);
 }
 
-// How far the bus still has to drive to reach the stop. It passes each stop
-// twice per round trip, once in each direction, so take the nearer pass.
-export function getMetresToStop(route, path, stop, travelledMetres) {
+// A bus passes each stop twice per round trip, once in each direction.
+// Returns how far it still has to drive to each pass.
+function getMetresToPasses(route, path, stop, travelledMetres) {
   const roundTrip = getRouteLength(path) * 2;
   const stopDistance = path.distances[route.stops.indexOf(stop)];
   const travelled = normaliseTravelled(path, travelledMetres);
+  return {
+    outbound: (stopDistance - travelled + roundTrip) % roundTrip,
+    inbound: (roundTrip - stopDistance - travelled + roundTrip) % roundTrip
+  };
+}
 
-  const toOutboundPass = (stopDistance - travelled + roundTrip) % roundTrip;
-  const toInboundPass = (roundTrip - stopDistance - travelled + roundTrip) % roundTrip;
-  return Math.min(toOutboundPass, toInboundPass);
+// How far the bus still has to drive to reach the stop: the nearer pass.
+export function getMetresToStop(route, path, stop, travelledMetres) {
+  const passes = getMetresToPasses(route, path, stop, travelledMetres);
+  return Math.min(passes.outbound, passes.inbound);
+}
+
+// Which way the bus will be going when it next leaves the stop. It turns
+// round at each end, so it always leaves the first stop outbound and the
+// last stop inbound.
+export function getDirectionAtStop(route, path, stop, travelledMetres) {
+  const index = route.stops.indexOf(stop);
+  if (index === 0) return "outbound";
+  if (index === route.stops.length - 1) return "inbound";
+  const passes = getMetresToPasses(route, path, stop, travelledMetres);
+  return passes.outbound <= passes.inbound ? "outbound" : "inbound";
 }
 
 // ETA = (distance / average speed) + traffic delay

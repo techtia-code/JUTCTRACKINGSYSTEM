@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b6e4f" />
   <meta name="description" content="Publish simulated bus locations and manage assigned JUTC demonstration buses." />
   <title>Driver console | JUTC Bus Tracker</title>
   <link rel="stylesheet" href="./STYLES/style.css" />
@@ -10,11 +11,10 @@
 <body data-page="driver">
   <header class="site-header"><div class="container header-inner">
     <a class="logo" href="index.html">JUTC <span>Bus Tracker</span></a>
-    <nav class="nav" aria-label="Main navigation"><a href="index.html">Journey planner</a><a href="admin.html">Route management</a></nav>
+    <nav class="nav" aria-label="Main navigation"><a href="index.html">Journey planner</a></nav>
   </div></header>
-  <main class="driver-main container">
-    <div class="section-head"><div><p class="eyebrow eyebrow-dark">BUS OPERATIONS</p><h1>Driver console</h1></div><button id="driver-sign-out" class="btn btn-secondary" hidden>Sign out</button></div>
-    <p class="section-intro">Simulated buses run automatically, even when no driver is logged in. Sign in to stop or restart your assigned bus, or update its service status.</p>
+  <main class="container page-main driver-main">
+    <div class="page-head"><h1>Driver console</h1><button id="driver-sign-out" class="btn btn-secondary btn-small" hidden>Sign out</button></div>
     <section id="driver-login" class="admin-card" aria-labelledby="driver-login-title">
       <h2 id="driver-login-title">Driver login</h2>
       <form id="driver-login-form" class="route-form">
@@ -23,19 +23,20 @@
         <button class="btn btn-primary" type="submit">Sign in</button>
       </form>
       <button id="driver-demo-login" class="btn btn-primary" hidden>Enter local demo as driver</button>
+      <p class="fine-print">Simulated buses keep running without a driver. Sign in to stop or restart your bus.</p>
     </section>
     <p id="driver-feedback" class="admin-message" role="status"></p>
     <section id="driver-console" class="admin-card" aria-labelledby="assigned-title" hidden>
-      <h2 id="assigned-title">Your buses</h2>
+      <h2 id="assigned-title">Your bus</h2>
       <div class="field"><label for="driver-bus">Assigned bus</label><select id="driver-bus"></select></div>
       <div id="driver-bus-details" class="driver-details" aria-live="polite"></div>
       <div class="driver-actions"><button id="engine-start" class="btn btn-primary">Go Live</button><button id="engine-stop" class="btn btn-secondary">Stop engine</button></div>
-      <div class="field"><label for="driver-status">Service status</label><select id="driver-status"><option value="on_time">On time</option><option value="delayed">Delayed</option></select></div>
-      <button id="driver-save-status" class="btn btn-secondary">Update status</button>
-      <p class="fine-print">Go Live starts the bus simulation. Stop engine parks it until you choose Go Live again. Signing out or closing this page leaves the simulation running. Phone GPS sharing below still requires this page to stay open.</p>
+      <label for="driver-status">Service status</label>
+      <div class="inline-row"><select id="driver-status"><option value="on_time">On time</option><option value="delayed">Delayed</option></select><button id="driver-save-status" class="btn btn-secondary">Update</button></div>
+      <p class="fine-print">Stop engine parks the bus until you choose Go Live. Signing out leaves the simulation running.</p>
     </section>
     <section id="driver-content" class="admin-card" aria-labelledby="driver-route" hidden>
-      <p class="eyebrow eyebrow-dark">ROUTE LOCATION SHARING</p>
+      <p class="result-label">Route location sharing</p>
       <h2 id="driver-route"></h2>
       <p id="driver-route-stops" class="muted-copy"></p>
       <p id="route-sharing-status" class="driver-status" aria-live="polite">Not sharing</p>
@@ -46,7 +47,7 @@
         <button id="stop-sharing" class="btn btn-secondary" type="button" hidden>Stop sharing</button>
       </div>
       <p id="driver-message" class="admin-message" aria-live="polite"></p>
-      <p class="fine-print">Available to accounts with a route assignment. GPS sharing requires your browser's location permission and HTTPS or localhost. Keep this page open while sharing. Route-shared positions appear as a separate labelled bus and expire after one minute without an update.</p>
+      <p class="fine-print">Needs location permission and HTTPS. Keep this page open while sharing; your bus leaves the map a minute after updates stop.</p>
     </section>
   </main>
   <div id="app-error" class="app-error" role="alert" hidden></div>

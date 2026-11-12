@@ -7,17 +7,11 @@ function showAppError(error) {
   notice.textContent = "The bus information could not be loaded. " + error.message;
 }
 
-if (document.getElementById('loading-root')) {
-  import('./loading-ui.jsx').then(({ mountLoadingSkeleton }) => {
-    if (document.documentElement.dataset.jutcReady !== 'true') mountLoadingSkeleton(document.body.dataset.page);
-  }).catch(error => console.error('Could not load the loading indicator', error));
-}
-
 const notice = document.createElement('p');
 notice.className = 'prototype-notice';
 notice.textContent = isDemoMode()
-  ? 'Local demonstration · Sample data is saved only in this browser. Demo roles are not real accounts.'
-  : 'Academic demonstration · Buses show saved simulation data or a driver-shared location, as labelled. Estimates are not official JUTC service information.';
+  ? 'Local demo · Data is saved only in this browser.'
+  : 'Academic demo · Not official JUTC service information.';
 document.querySelector('.site-header')?.after(notice);
 
 async function initializePage() {
@@ -29,8 +23,8 @@ async function initializePage() {
     console.error("Could not initialize the JUTC bus tracker demonstration.", error);
     showAppError(error);
   } finally {
+    // Ends the loading shimmer on empty lists (see style.css).
     document.documentElement.dataset.jutcReady = 'true';
-    window.dispatchEvent(new window.Event('jutc:ready'));
   }
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initializePage, { once: true });

@@ -2,17 +2,17 @@
 
 A bus journey planner and tracking demo for the Kingston Metropolitan Area. Riders can find a route between two stops, watch buses move on a map, check arrival estimates, read service alerts and ask to be told when their bus is near. Bus drivers share their bus's location from their phone. Administrators log in to manage stops, routes and alerts.
 
-This is a school project, not affiliated with the Jamaica Urban Transit Company. The fleet has individually labelled buses with saved simulated positions. Drivers with a route assignment can also share a phone location or simulate a route drive; that feed is shown separately as a labelled driver-shared bus.
+This is a school project, not affiliated with the Jamaica Urban Transit Company. As riders do in Jamaica, each route is known by its route number (for example **22** Spanish Town to Downtown Kingston, or **900** Half-Way Tree to Papine), and each bus has its own fleet number (Bus 1001, Bus 1002, ...). The sample numbers are modelled on real JUTC corridors but are illustrative, not official service information. The fleet buses have saved simulated positions. Drivers with a route assignment can also share a phone location or simulate a route drive; that feed is shown separately as a "Live driver bus".
 
 ## Features
 
 **Journey planner (`index.html`)**
-- Find a direct route between two stops, in either direction.
+- Find a direct route between two stops, in either direction, choosing each stop from a list.
 - Journey search opens the matching routes and their buses on the map. Use **View buses on map** to focus one route, or **Show all routes** to reset the map. Route-name filtering also filters the map; bus refreshes preserve the selected view.
-- Search the route list by route name or stop.
+- Search the route list by route number, route name or stop.
 - Map of Kingston with each route drawn along the roads, its stops and its bus, plus a list showing each bus's next stop and whether it is live from the driver or simulated.
-- Arrival estimates for any stop, updated every 5 seconds and including any delays from service alerts.
-- **Notify me when it's near:** a message (and a browser notification, if allowed) when the bus is within 1 km of the chosen stop, or when a new delay is reported for the route. It works while the page is open.
+- **Arrivals board:** choose a route and your stop to see every bus on that route with its estimate, soonest first, updated every 5 seconds and including any delays from service alerts. Parked buses and buses with paused location updates are listed without an estimate.
+- **Notify me:** tap the bell on a bus for a message (and a browser notification, if allowed) when it is within 1 km of your stop or delayed. The browser asks for notification permission on the first tap; without it, alerts show on the page. A banner shows which bus is being watched, with a **Stop** button. It works while the page is open.
 - Service alerts, refreshed every 30 seconds.
 
 **Bus drivers (`driver.html`)**
@@ -26,9 +26,9 @@ This is a school project, not affiliated with the Jamaica Urban Transit Company.
 **Route management (`admin.html`)**
 - Administrator login.
 - Add, edit and delete stops (a stop a route uses cannot be deleted).
-- Add, edit and delete routes.
+- Add, edit and delete routes, each with a route number such as 22, 21A or 900.
 - Publish and remove service alerts (delays, route changes and disruptions) for one route or all routes.
-- Add individually labelled buses and assign parked buses using a driver's name or email. Driver account UUIDs are handled inside the database.
+- Add buses by fleet number (3 to 5 digits) and assign parked buses using a driver's name or email. Driver account UUIDs are handled inside the database.
 
 ## Built with
 
@@ -36,8 +36,9 @@ This is a school project, not affiliated with the Jamaica Urban Transit Company.
 - [Supabase](https://supabase.com) for the database and login
 - [Leaflet](https://leafletjs.com) with [OpenStreetMap](https://www.openstreetmap.org) map tiles
 - The free public [OSRM](https://project-osrm.org) routing service for the roads each route follows
-- [Tailwind CSS](https://tailwindcss.com), plus React and Framer Motion for the loading screen
 - Node's built-in test runner for unit tests
+
+The pages are designed mobile first: on a phone the journey planner has a bottom tab bar, the map moves with two fingers so one finger scrolls the page, and the admin sections collapse.
 
 ## How it works
 
@@ -57,7 +58,9 @@ ETA (minutes) = distance to the stop ÷ average speed + delays from service aler
 
 Distances are straight lines between stops, worked out from their coordinates with the haversine formula. Real roads are longer, so for a real bus the estimate comes out a little early.
 
-**Notify me.** Every 5 seconds, with the arrival estimate, the page checks how far the bus is from the chosen stop. At 1 km or less it shows the message once and stops watching; a new delay alert for the route is announced as it appears.
+**Notify me.** Every 5 seconds, with the arrival estimates, the page checks how far the watched bus is from the chosen stop. At 1 km or less, or when the bus or route is delayed, it shows the alert and sends one browser notification. Changing the route or stop, or the bus leaving the route, stops the watch.
+
+**Route and fleet numbers.** Existing databases need `supabase/update-route-numbers.sql` once. It adds the route `number` column, gives the sample routes their numbers, and renames generated bus labels such as `JUTC-SAMPLE-1a2b3c4d` or `JUTC-1001` to fleet numbers (1001, 1002, ...). It also adds `jutc_save_numbered_route`, which the admin page uses to save a route and its number together. Until it runs, the site still loads and shows routes without numbers, but saving a route asks for the update. New installations already include it in `schema.sql`.
 
 **Who can change data.** Supabase row level security rules mean anyone can read stops, routes, alerts and bus locations, but only administrator accounts in `user_roles` or the compatible `admins` table can change management data. Fleet drivers can operate only their assigned buses. Drivers listed in `drivers` can share a location for their own route only. The rules are enforced by the database, so they can't be bypassed from the browser. Route changes are saved by a single database function (`jutc_save_route`), so a route is either fully saved or left unchanged.
 

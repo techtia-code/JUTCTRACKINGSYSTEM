@@ -17,8 +17,8 @@ import {
 import { demoLogIn } from './data.js';
 import { isDemoMode } from './supabase.js';
 import { initFleetManagement } from './management.js';
-import { makeElement, makeIcon, setHeading, setMessage } from "./dom.js";
-import { validateAlert, validateRoute, validateStop } from "./planner.js";
+import { makeElement, makeIcon, makeRouteHeading, setHeading, setMessage } from "./dom.js";
+import { routeLabel, validateAlert, validateRoute, validateRouteNumber, validateStop } from "./planner.js";
 
 function makeEditButton(label, title) {
   const button = makeElement("button", "admin-icon-button");
@@ -46,6 +46,7 @@ async function initManagement() {
   let currentAlerts = alerts;
   let editingId = null;
   const form = document.getElementById("route-form");
+  const numberInput = document.getElementById("route-number");
   const nameInput = document.getElementById("route-name");
   const stopsInput = document.getElementById("route-stops");
   const saveButton = document.getElementById("save-route");
@@ -97,7 +98,7 @@ async function initManagement() {
     allRoutes.value = "";
     alertRoute.replaceChildren(allRoutes);
     currentRoutes.forEach(route => {
-      const option = makeElement("option", "", route.name);
+      const option = makeElement("option", "", routeLabel(route));
       option.value = route.id;
       alertRoute.append(option);
     });
@@ -119,7 +120,7 @@ async function initManagement() {
       const card = makeElement("article", "admin-route");
       const details = makeElement("div", "admin-route-details");
       details.append(
-        makeElement("h3", "", route.name),
+        makeRouteHeading("h3", route),
         makeElement("p", "muted-copy", route.stops.join(" to "))
       );
       const actions = makeElement("div", "admin-route-actions");
@@ -130,13 +131,14 @@ async function initManagement() {
       editButton.prepend(makeIcon("pencil"));
       editButton.addEventListener("click", () => {
         editingId = route.id;
+        numberInput.value = route.number || "";
         nameInput.value = route.name;
         stopsInput.value = route.stops.join(", ");
         saveButton.replaceChildren(makeIcon("pencil"), document.createTextNode(" Save changes"));
         cancelButton.hidden = false;
         setHeading(document.getElementById("route-form-heading"), "pencil", "Edit sample route");
         setMessage(message, "Editing " + route.name + ".", false);
-        nameInput.focus();
+        numberInput.focus();
       });
 
       const deleteButton = makeDeleteButton("Delete " + route.name, "Delete route");
@@ -275,6 +277,12 @@ async function initManagement() {
 
   form.addEventListener("submit", async event => {
     event.preventDefault();
+    const routeNumber = validateRouteNumber(numberInput.value, currentRoutes, editingId);
+    if (routeNumber.error) {
+      setMessage(message, routeNumber.error, true);
+      numberInput.focus();
+      return;
+    }
     const result = validateRoute(nameInput.value, stopsInput.value, validStops, currentRoutes, editingId);
     if (result.error) {
       setMessage(message, result.error, true);
@@ -284,7 +292,7 @@ async function initManagement() {
 
     saveButton.disabled = true;
     try {
-      await saveRoute(editingId, result.name, result.stops);
+      await saveRoute(editingId, result.name, result.stops, routeNumber.number);
       currentRoutes = await loadRoutes();
     } catch (error) {
       console.error("Could not save the sample route.", error);

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as demo from '../JS/demo-store.js';
+import { makeSampleData } from '../JS/sample-data.js';
 
 function storage() { const values = new Map(); return { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) }; }
 function makeStore(shared = storage()) {
@@ -13,7 +14,7 @@ test('new unassigned buses run without a driver and explicit stops survive reope
   const shared = storage(), sessionStorage = storage();
   const store = demo.createDemoStore({ storage: shared, sessionStorage, now: () => clock });
   store.signIn('admin');
-  const busId = store.saveBus('JUTC-2001', store.loadRoutes()[0].id, null);
+  const busId = store.saveBus('2001', store.loadRoutes()[0].id, null);
   const first = store.loadBuses().find(b => b.id === busId);
   assert.equal(first.engineOn, true);
   store.signOut(); clock += 5000;
@@ -39,7 +40,7 @@ test('driver assignments accept names or emails and return no account IDs', () =
   const store = makeStore();
   assert.throws(() => store.loadAssignments(), /administrator/i);
   store.signIn('admin');
-  const busId = store.saveBus('JUTC-3001', store.loadRoutes()[0].id, ' DRIVER@JUTC.EXAMPLE.INVALID ');
+  const busId = store.saveBus('3001', store.loadRoutes()[0].id, ' DRIVER@JUTC.EXAMPLE.INVALID ');
   const assignment = store.loadAssignments().find(a => a.busId === busId);
   assert.deepEqual(assignment, { busId, driverName: 'Demo Driver', driverEmail: 'driver@jutc.example.invalid' });
   assert.equal(JSON.stringify(store.loadAssignments()).includes('demo-driver'), false);
@@ -69,10 +70,10 @@ test('admin creates stops and buses persistently and route deletion removes depe
   const shared = storage(); const store = makeStore(shared); store.signIn('admin');
   store.saveStop('Test stop', 18.1, -76.9);
   const routeId = store.saveRoute(null, 'Test route', ['Test stop', 'Papine']);
-  store.saveBus('JUTC-TEST', routeId, null);
+  store.saveBus('4001', routeId, null);
   const reopened = makeStore(shared);
   assert.ok(reopened.loadStops().some(s => s.name === 'Test stop'));
-  assert.ok(reopened.loadBuses().some(b => b.label === 'JUTC-TEST'));
+  assert.ok(reopened.loadBuses().some(b => b.label === '4001'));
   store.deleteRoute(routeId);
   assert.ok(!store.loadBuses().some(b => b.routeId === routeId));
 });
@@ -81,7 +82,36 @@ test('invalid route changes preserve the existing route and stops', () => {
   const original = store.loadRoutes()[0];
   assert.throws(() => store.saveRoute(original.id, 'Changed route', ['Missing', 'Papine']), /stop/i);
   assert.deepEqual(store.loadRoutes()[0], original);
-  assert.throws(() => store.saveBus('BUS', 'missing-route', null), /route/i);
+  assert.throws(() => store.saveBus('4002', 'missing-route', null), /route/i);
+});
+test('sample routes have JUTC-style numbers and buses have fleet numbers', () => {
+  const store = makeStore();
+  assert.deepEqual(store.loadRoutes().map(r => r.number), ['32', '900', '22', '68']);
+  assert.ok(store.loadBuses().every(b => /^\d{4}$/.test(b.label)));
+  store.signIn('admin');
+  assert.throws(() => store.saveBus('JUTC-SAMPLE-1a2b3c4d', store.loadRoutes()[0].id, null), /fleet number/i);
+  assert.throws(() => store.saveBus('1001', store.loadRoutes()[0].id, null), /already/i);
+});
+test('route numbers are validated, unique and kept when a route is edited without one', () => {
+  const store = makeStore(); store.signIn('admin');
+  const id = store.saveRoute(null, 'New numbered route', ['Cross Roads', 'Papine'], ' 21a ');
+  assert.equal(store.loadRoutes().find(r => r.id === id).number, '21A');
+  assert.throws(() => store.saveRoute(null, 'Another route', ['Cross Roads', 'Papine'], '22'), /already/i);
+  assert.throws(() => store.saveRoute(null, 'Bad number route', ['Cross Roads', 'Papine'], 'A1'), /route number/i);
+  store.saveRoute(id, 'Renamed numbered route', ['Cross Roads', 'Papine']);
+  assert.equal(store.loadRoutes().find(r => r.id === id).number, '21A');
+  const stop = store.loadStops().find(s => s.name === 'Papine');
+  store.updateStop(stop.id, 'Papine Square', stop.lat, stop.lng);
+  assert.equal(store.loadRoutes().find(r => r.id === id).number, '21A', 'stop edits keep route numbers');
+});
+test('saved demo data is upgraded to fleet numbers and route numbers', () => {
+  const shared = storage(), state = makeSampleData(Date.parse('2026-11-08T12:00:00Z'));
+  ['JUTC-1001', 'JUTC-DEMO-02', '1003', '1004', '1005'].forEach((label, i) => { state.buses[i].label = label; });
+  state.routes.forEach(route => { delete route.number; });
+  shared.setItem('jutc-demo-data-v1', JSON.stringify(state));
+  const store = makeStore(shared);
+  assert.deepEqual(store.loadBuses().map(b => b.label), ['1001', '1002', '1003', '1004', '1005']);
+  assert.deepEqual(store.loadRoutes().map(r => r.number), ['32', '900', '22', '68']);
 });
 test('demo authentication is explicit and sign-out removes permissions', () => {
   const store = makeStore();

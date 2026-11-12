@@ -1,6 +1,6 @@
-import { makeSampleData } from './sample-data.js';
-import { elapsedSeconds, projectSimulatedBus, simulateBus } from './fleet.js';
-import { validateAlert, validateRoute, validateStop } from './planner.js';
+import { makeSampleData, SAMPLE_ROUTE_NUMBERS } from './sample-data.js';
+import { elapsedSeconds, projectSimulatedBus, simulateBus, validateFleetNumber } from './fleet.js';
+import { validateAlert, validateRoute, validateRouteNumber, validateStop } from './planner.js';
 import { makeRoutePath } from './simulation.js';
 
 const DATA_KEY = 'jutc-demo-data-v1';
@@ -21,14 +21,26 @@ export function createDemoStore({ storage, sessionStorage, now = Date.now }) {
       try {
         const state = JSON.parse(saved);
         if (state.version === 1) {
-          // Upgrade saved demo labels without resetting routes, assignments or positions.
+          // Upgrade saved demo data without resetting routes, assignments or positions:
+          // "JUTC-1001" becomes fleet number "1001", "JUTC-DEMO-01" gets the next free
+          // number, and the sample routes gain their route numbers.
           let number = 1001, changed = false;
-          const used = new Set(state.buses.map(bus => bus.label.toUpperCase()));
+          const used = new Set(state.buses.map(bus => bus.label.replace(/^JUTC-(?=\d+$)/i, '')));
           for (const bus of state.buses) {
             if (bus.autonomousSimulation === undefined) { bus.autonomousSimulation = true; changed = true; }
+            const legacy = bus.label.match(/^JUTC-(\d+)$/i);
+            if (legacy) { bus.label = legacy[1]; changed = true; continue; }
             if (!/^JUTC-DEMO-\d+$/.test(bus.label)) continue;
-            while (used.has(`JUTC-${number}`)) number++;
-            bus.label = `JUTC-${number++}`; used.add(bus.label); changed = true;
+            while (used.has(String(number))) number++;
+            bus.label = String(number++); used.add(bus.label); changed = true;
+          }
+          const usedNumbers = new Set(state.routes.map(route => route.number).filter(Boolean));
+          for (const route of state.routes) {
+            if (route.number !== undefined) continue;
+            const sample = SAMPLE_ROUTE_NUMBERS[route.name];
+            route.number = sample && !usedNumbers.has(sample) ? sample : null;
+            if (route.number) usedNumbers.add(route.number);
+            changed = true;
           }
           if (changed) storage.setItem(DATA_KEY, JSON.stringify(state));
           return state;
@@ -95,11 +107,18 @@ export function createDemoStore({ storage, sessionStorage, now = Date.now }) {
         state.stops = state.stops.filter(s => s.id !== stopId);
       });
     },
-    saveRoute(routeId, name, stopNames) {
+    saveRoute(routeId, name, stopNames, number) {
       admin(); return mutate(state => {
         const result = validateRoute(name, stopNames.join(','), state.stops.map(s => s.name), state.routes, routeId);
         if (result.error) throw new Error(result.error);
-        const route = { id: routeId || id(), name: result.name, stops: result.stops };
+        // Leaving the number out keeps the route's current number, like stop edits in the database.
+        let routeNumber = state.routes.find(r => r.id === routeId)?.number ?? null;
+        if (number !== undefined && number !== null && String(number).trim() !== '') {
+          const checkedNumber = validateRouteNumber(number, state.routes, routeId);
+          if (checkedNumber.error) throw new Error(checkedNumber.error);
+          routeNumber = checkedNumber.number;
+        }
+        const route = { id: routeId || id(), number: routeNumber, name: result.name, stops: result.stops };
         makeRoutePath(route, Object.fromEntries(state.stops.map(s => [s.name, [s.lat, s.lng]])));
         if (routeId) { const index = state.routes.findIndex(r => r.id === routeId); if (index < 0) throw new Error('Route not found.'); state.routes[index] = route;
           state.buses.filter(b => b.routeId === routeId).forEach(b => Object.assign(b, { engineOn: false, preview: false, startedAt: null, progressSeconds: 0, locationProgressSeconds: 0, lat: state.stops.find(s => s.name === route.stops[0]).lat, lng: state.stops.find(s => s.name === route.stops[0]).lng, nextStop: route.stops[1], updatedAt: new Date(now()).toISOString() }));
@@ -117,7 +136,8 @@ export function createDemoStore({ storage, sessionStorage, now = Date.now }) {
     }); },
     deleteAlert(alertId) { admin(); mutate(s => { s.alerts = s.alerts.filter(a => a.id !== alertId); }); },
     saveBus(label, routeId, driver) { admin(); return mutate(s => {
-      label = label.trim(); if (!label || label.length > 60 || s.buses.some(b => b.label.toLowerCase() === label.toLowerCase())) throw new Error('Enter a unique bus label (1 to 60 characters).');
+      const fleetNumber = validateFleetNumber(label, s.buses); if (fleetNumber.error) throw new Error(fleetNumber.error);
+      label = fleetNumber.number;
       const route = s.routes.find(r => r.id === routeId); if (!route) throw new Error('Choose an available route.');
       makeRoutePath(route, Object.fromEntries(s.stops.map(stop => [stop.name, [stop.lat, stop.lng]])));
       const driverId = resolveDriver(driver);
