@@ -21,7 +21,7 @@ export function validateFleetNumber(entered, buses = []) {
   return { number };
 }
 
-export const BUS_STATE_LABELS = { parked: 'Parked', stale: 'Location stale', delayed: 'Delayed', running: 'Running' };
+export const BUS_STATE_LABELS = { parked: 'Parked', stale: 'Location stale', delayed: 'Delay expected', running: 'Running' };
 
 export function busState(bus, now = Date.now()) {
   if (!bus.engineOn) return 'parked';
@@ -102,6 +102,6 @@ export function getBusAlerts(bus, distanceMetres, routeDelayed = false, now = Da
   if (!bus || !bus.engineOn || !isFresh(bus, now)) return [];
   const alerts = [];
   if (Number.isFinite(distanceMetres) && distanceMetres <= 1000) alerts.push({ type: 'nearby', message: `${busName(bus)} is within 1 km of your stop.` });
-  if (bus.status === 'delayed' || routeDelayed) alerts.push({ type: 'delay', message: `${busName(bus)} has a reported delay.` });
+  if (bus.status === 'delayed' || routeDelayed) alerts.push({ type: 'delay', message: `${busName(bus)} is expecting a delay.` });
   return alerts;
 }

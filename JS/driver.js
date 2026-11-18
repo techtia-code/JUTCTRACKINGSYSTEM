@@ -7,17 +7,20 @@ import { isDemoMode } from './supabase.js';
 export async function initDriver() {
   const select = document.getElementById('driver-bus'), details = document.getElementById('driver-bus-details');
   const feedback = document.getElementById('driver-feedback'), start = document.getElementById('engine-start'), stop = document.getElementById('engine-stop');
-  const saveStatus = document.getElementById('driver-save-status'), status = document.getElementById('driver-status');
+  const delay = document.getElementById('driver-delay');
   let buses = [], routes = [], busy = false, timer, stopRouteSharing = null;
   function message(text, error = false) { feedback.textContent = text; feedback.classList.toggle('error', error); }
   function render() {
-    const bus = buses.find(b => b.id === select.value);
-    details.replaceChildren(); start.disabled = !bus || bus.engineOn; stop.disabled = !bus || !bus.engineOn; saveStatus.disabled = !bus;
+    const bus = buses.find(b => b.id === select.value), delayed = bus?.status === 'delayed';
+    details.replaceChildren(); start.disabled = !bus || bus.engineOn; stop.disabled = !bus || !bus.engineOn;
+    // Riders only see delays on running buses, so the toggle is off while parked.
+    delay.disabled = !bus || !bus.engineOn;
+    delay.textContent = delayed ? 'Back on time' : 'Delay expected';
+    delay.setAttribute('aria-pressed', String(delayed)); delay.classList.toggle('is-delayed', delayed);
     if (!bus) { details.append(makeElement('p', 'empty-state', 'No buses are assigned to this account. Ask an administrator to assign a bus.')); return; }
-    status.value = bus.status;
     details.append(makeElement('h3', '', busName(bus)),
       makeElement('p', '', routeLabel(routes.find(r => r.id === bus.routeId)) || 'Route unavailable'),
-      makeElement('p', '', `Engine ${bus.engineOn ? 'on' : 'off'} · ${bus.status === 'delayed' ? 'Delayed' : 'On time'} · Next stop: ${bus.nextStop || 'Not available'}`),
+      makeElement('p', '', `Engine ${bus.engineOn ? 'on' : 'off'} · ${delayed ? 'Delay expected' : 'On time'} · Next stop: ${bus.nextStop || 'Not available'}`),
       makeElement('p', 'fine-print', `Last update: ${bus.updatedAt ? new Date(bus.updatedAt).toLocaleTimeString() : 'Not available'}`));
   }
   async function refresh() {
@@ -46,22 +49,31 @@ export async function initDriver() {
     window.addEventListener('pagehide', () => clearInterval(timer), { once: true });
   }
   async function action(name, newStatus = null) {
-    if (busy || !select.value) return; busy = true; start.disabled = stop.disabled = saveStatus.disabled = true;
-    try { await updateBus(select.value, name, newStatus); await refresh(); message(name === 'stop' ? 'Engine stopped. Location publishing paused.' : 'Bus updated.'); }
+    if (busy || !select.value) return; busy = true; start.disabled = stop.disabled = delay.disabled = true;
+    try {
+      await updateBus(select.value, name, newStatus); await refresh();
+      if (name === 'stop') message('Engine stopped. Location publishing paused.');
+      else if (name === 'status') message(newStatus === 'delayed' ? "Delay reported. Riders will see 'Delay expected'." : 'Marked back on time.');
+      else message('Bus updated.');
+    }
     catch (error) { message(error.message, true); render(); }
     finally { busy = false; }
   }
   select.addEventListener('change', render);
   start.addEventListener('click', () => action('start'));
-  stop.addEventListener('click', () => action('stop'));
-  saveStatus.addEventListener('click', () => action('status', status.value));
+  // Stopping the engine also clears any expected delay.
+  stop.addEventListener('click', () => action('stop', 'on_time'));
+  delay.addEventListener('click', () => {
+    const bus = buses.find(b => b.id === select.value);
+    if (bus) action('status', bus.status === 'delayed' ? 'on_time' : 'delayed');
+  });
   document.getElementById('driver-sign-out').addEventListener('click', async () => {
     if (busy) return; busy = true;
     try {
       if (stopRouteSharing) await stopRouteSharing();
       // Autonomous simulations retain their saved state after sign-out.
       const session = await getSession();
-      if (session && ['admin', 'driver'].includes(session.role)) for (const bus of (await loadAssignedBuses()).filter(b => b.engineOn && !b.preview && !b.autonomousSimulation)) await updateBus(bus.id, 'stop');
+      if (session && ['admin', 'driver'].includes(session.role)) for (const bus of (await loadAssignedBuses()).filter(b => b.engineOn && !b.preview && !b.autonomousSimulation)) await updateBus(bus.id, 'stop', 'on_time');
       await logOut(); clearInterval(timer); window.location.reload();
     } catch (error) { message(error.message, true); } finally { busy = false; }
   });

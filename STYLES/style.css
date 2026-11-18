@@ -378,6 +378,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--green); outline:
 .driver-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 14px 0; }
 .driver-status { margin: 8px 0 4px; color: var(--muted); font-size: 1.1rem; font-weight: 750; }
 .driver-status.is-live { color: var(--green); }
+#driver-delay.is-delayed { border-color: var(--yellow); background: #fff8e1; color: var(--text); }
 
 .app-error {
   position: fixed;

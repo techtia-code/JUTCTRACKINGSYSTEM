@@ -31,9 +31,8 @@
       <div class="field"><label for="driver-bus">Assigned bus</label><select id="driver-bus"></select></div>
       <div id="driver-bus-details" class="driver-details" aria-live="polite"></div>
       <div class="driver-actions"><button id="engine-start" class="btn btn-primary">Go Live</button><button id="engine-stop" class="btn btn-secondary">Stop engine</button></div>
-      <label for="driver-status">Service status</label>
-      <div class="inline-row"><select id="driver-status"><option value="on_time">On time</option><option value="delayed">Delayed</option></select><button id="driver-save-status" class="btn btn-secondary">Update</button></div>
-      <p class="fine-print">Stop engine parks the bus until you choose Go Live. Signing out leaves the simulation running.</p>
+      <div class="driver-actions"><button id="driver-delay" class="btn btn-secondary" type="button" aria-pressed="false">Delay expected</button></div>
+      <p class="fine-print">Delay expected tells riders your bus is running late; it clears when you stop the engine. Stop engine parks the bus until you choose Go Live. Signing out leaves the simulation running.</p>
     </section>
     <section id="driver-content" class="admin-card" aria-labelledby="driver-route" hidden>
       <p class="result-label">Route location sharing</p>

@@ -91,7 +91,7 @@ export function initArrivals() {
     if (bus.source === 'driver') parts.push('Live driver location');
     if (turnsAt) parts.push(`Turns round at ${turnsAt} first`);
     else if (bus.nextStop) parts.push('Next stop: ' + bus.nextStop);
-    if (state === 'delayed') parts.push('Driver reports a delay');
+    if (state === 'delayed') parts.push('Delay expected');
     if (delay > 0) parts.push(`Includes ${delay} min delay`);
     return parts.join(' · ') || 'On the route';
   }
